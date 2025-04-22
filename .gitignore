@@ -4,3 +4,4 @@
 # Ignore Windows batch files
 build.bat
 run.bat
+main.exe

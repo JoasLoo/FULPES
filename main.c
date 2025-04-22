@@ -47,5 +47,6 @@ int main() {
     }
 
     Py_Finalize();  //exit the python environment
+    getchar();
     return 0;
 }
