@@ -1,3 +1,0 @@
-@echo off
-echo Running program...
-.\main.exe
