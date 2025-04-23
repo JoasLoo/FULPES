@@ -5,6 +5,5 @@
 build.bat
 run.bat
 main.exe
-build.bat
-*.bat
-*.exe
+/FlowbasedOfflineChargingScheduler/build
+FlowbasedOfflineChargingScheduler/main.spec
