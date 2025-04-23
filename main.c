@@ -1,6 +1,104 @@
+/*import networkx as nx
+import copy
+from networkx.algorithms.flow import shortest_augmenting_path
+from networkx.algorithms.flow import edmonds_karp
+from networkx.algorithms.flow import preflow_push
+from networkx.algorithms.flow import dinitz
+import math
+import matplotlib.pyplot as plt
+import pandas as pd
+import statistics
+import csv
+
+#for gurobi model
+from gurobipy import *
+from itertools import product
+
+import os, sys
+import datetime
+import time
+import random
+
+from LP import LP
+from FOCS import FOCS, FlowNet, FlowOperations, FOCSinstance
+from Bookkeeping import Bookkeeping
+
+instanceSize = 10 #number of EVs/jobs in instance
+timeStep = 900 #quarterly granularity
+maxFlowAlg = shortest_augmenting_path #alternatively use e.g., edmonds_karp, preflow_push, or dinitz
+randomSample = True
+
+# Real Training data
+instanceData = pd.read_excel('../Data/ev_session_data_OR.xlsx')
+
+if not randomSample:
+    instance = FOCSinstance(instanceData[:instanceSize], timeStep)
+if randomSample:
+    sample = sorted(random.sample(range(0,len(instanceData)), instanceSize))
+    instance = FOCSinstance(instanceData.iloc[sample], timeStep)  
+
+'''--------------start FOCS--------------'''
+flowNet = FlowNet()
+flowNet.focs_instance_to_network(instance)
+flowOp = FlowOperations(flowNet.G, instance)
+focs = FOCS(instance, flowNet, flowOp)
+focs.flow_func = shortest_augmenting_path
+f = focs.solve_focs(MPCstopper=False, MPCcondition=0)
+
+obj_val = focs.objective()
+
+print('FOCS objective value = ', obj_val)
+print('FOCS flow (schedule in middle edge layer): \n', focs.f)*/
+
 #include <Python.h>
+#include <stdio.h>
+#include <stdbool.h>
+
+int instanceSize = 10; //number of EVs/jobs in instance
+int timeStep = 900; //quarterly granularity
+//maxFlowAlg = shortest_augmenting_path #alternatively use e.g., edmonds_karp, preflow_push, or dinitz
+bool randomSample = true;
+
+void Fail_EXIT(const char *msg)
+{
+    fprintf(stderr, "%s\n", msg);
+    PyErr_Print();
+    Py_Finalize();
+    exit(EXIT_FAILURE);
+}
 
 int main() {
+    Py_Initialize();
+    PyObject *pName = PyUnicode_DecodeFSDefault("FOCS");
+    PyObject *FOCS = PyImport_Import(pName);     //Import "FOCS".py
+    Py_DECREF(pName);
+    ////CHECK/////
+    if (FOCS == NULL) { //If FOCS python has been loaded:
+        Fail_EXIT("Couldn't open FOCS.py");
+    } 
+
+    PyObject *FOCS_class = PyObject_GetAttrString(FOCS, "FOCS"); //get hello func
+
+    ////CHECK/////
+    if(FOCS_class == NULL) {
+        Fail_EXIT("Couldn't read FOCS_class");
+    }
+
+    
+
+    printf("Run succesful! \n");
+    Py_DECREF(FOCS_class);
+    Py_DECREF(FOCS);
+    Py_Finalize();
+    return 0;
+}
+
+
+
+
+
+////////////////////////////////////////////////example code
+/*int main() {
     Py_Initialize(); //Initialize the Python interpreter.
 
     // Load script.py
@@ -48,4 +146,4 @@ int main() {
 
     Py_Finalize();  //exit the python environment
     return 0;
-}
+}*/
