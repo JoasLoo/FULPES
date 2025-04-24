@@ -4,8 +4,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include <time.h>
 
-int instanceSize = 10; //number of EVs/jobs in instance
+int instanceSize = 500; //number of EVs/jobs in instance
 int timeStep = 900; //quarterly granularity
 //maxFlowAlg = shortest_augmenting_path #alternatively use e.g., edmonds_karp, preflow_push, or dinitz
 bool randomSample = true;
@@ -30,75 +31,66 @@ struct DataHelp getDataC(FILE *data);
 int main() {
     
     FILE *data; 
-    data = fopen("Data/DEMSdata_FOCS_v1.csv","r"); //open data file in C
+    data = fopen("Data/ev_session_data_OR.csv","r"); //open data file in C DEMSdata_FOCS_v1.csv ev_session_data_OR.csv
     if(data == NULL) { //Check if data file opened succesfully
         printf("Cant open data.csv");
         exit(0);
     }
     //Start Python environment
     Py_Initialize();
+    
     //Import FOCS.py
     PyObject *pName = PyUnicode_DecodeFSDefault("FOCS");
     PyObject *FOCS = PyImport_Import(pName);
     Py_DECREF(pName);
+    
     //Import script.py
     PyObject *pName1 = PyUnicode_DecodeFSDefault("script");
     PyObject *script = PyImport_Import(pName1);
     Py_DECREF(pName1);
-    ////CHECK ALL IMPORTED PYTHON FILES/////
-    if (FOCS == NULL || script == NULL) { //If FOCS python has been loaded:
-        Fail_EXIT("Couldn't open FOCS.py or script.py");
-    } 
-    //Get getData function
+    
+
+
+    //Import all necessary functions: 
     PyObject *getData_func = PyObject_GetAttrString(script, "getData");
-    //Get printdata function
     PyObject *printdata_func = PyObject_GetAttrString(script, "printdata");
-    //Get printdata function
     PyObject *WriteToDataframe_func = PyObject_GetAttrString(script, "WriteToDataframe");
-    //Get FOCSinstance class
     PyObject *FOCSinstance_class = PyObject_GetAttrString(FOCS, "FOCSinstance");
-    //Get FlowNet class
     PyObject *FlowNet_class = PyObject_GetAttrString(FOCS, "FlowNet");
-    //Get FlowOperations
     PyObject *FlowOperations_class = PyObject_GetAttrString(FOCS, "FlowOperations");
-    //Get FOCS class
     PyObject *FOCS_class = PyObject_GetAttrString(FOCS, "FOCS");
-    //////////////CHECK ALL CLASSES///////////////
-    if(FOCS_class == NULL || FlowNet_class == NULL || FOCSinstance_class == NULL || getData_func == NULL) {
-        Fail_EXIT("Couldn't read some class or function thing");
-    }
+    
+    clock_t t0 = clock();
     //Get data
     struct DataHelp dataToSolve = getDataC(data);
-
+    clock_t t1 = clock();
     //Convert to Python object to save
     PyObject *dataArgs = PyTuple_Pack(2, dataToSolve.Cols, dataToSolve.Names);
-    printf("made tuplepack: \n");
-
     PyObject *instanceData = PyObject_CallObject(WriteToDataframe_func, dataArgs);
-    printf("made instancedata: \n");
-    //Printdata
-    PyObject_CallObject(printdata_func, PyTuple_Pack(1, instanceData)); //Print the data obtained
+    clock_t t2 = clock();
+    //Printdata (dont do this when timing.)
+    //PyObject_CallObject(printdata_func, PyTuple_Pack(1, instanceData)); //Print the data obtained
     
     //Build FOCS_instance
     PyObject *focsInstArgs = Py_BuildValue("(Oi)", instanceData, timeStep);
     PyObject *instance = PyObject_CallObject(FOCSinstance_class, focsInstArgs);
     Py_DECREF(focsInstArgs);
-    
+    clock_t t3 = clock();
     //Build Flownet
     PyObject *flowNet   = PyObject_CallObject(FlowNet_class, NULL);
-    
+    clock_t t4 = clock();
     //call FlowNet.focs_instance_to_network
     PyObject *ret = PyObject_CallMethod(flowNet, "focs_instance_to_network", "O", instance);
-    
+    clock_t t5 = clock();
     //Build flowOp
     PyObject *graphG = PyObject_GetAttrString(flowNet, "G");
     PyObject *flowOpArgs = Py_BuildValue("(OO)", graphG, instance);
     PyObject *flowOp = PyObject_CallObject(FlowOperations_class, flowOpArgs);
-    
+    clock_t t6 = clock();
     //Run FOCS
     PyObject *focsArgs = Py_BuildValue("(OOO)", instance, flowNet, flowOp);
     PyObject *focs = PyObject_CallObject(FOCS_class, focsArgs);
-    
+    clock_t t7 = clock();
     //Set MaxFlowAlgorithm to shortest_augmenting_path
     PyObject *nx = PyImport_ImportModule("networkx.algorithms.flow");
     PyObject *sap = PyObject_GetAttrString(nx, "shortest_augmenting_path");
@@ -106,14 +98,12 @@ int main() {
         Fail_EXIT("could not set flow_func");
     }
 
-    
-    //Solve FOCS
-    //f = focs.solve_focs(MPCstopper=False, MPCcondition=0)
-
     PyObject *solve_ret = PyObject_CallMethod(focs, "solve_focs", NULL);
 
     if(!solve_ret) Fail_EXIT("solve_focs failed\n");
     
+    clock_t t8 = clock();
+
     // Give result
     PyObject *objValPy = PyObject_CallMethod(focs, "objective", NULL);
     if (!objValPy) Fail_EXIT("objective() failed");
@@ -123,9 +113,48 @@ int main() {
 
     printf("Objective value = %.9f\n", obj_val);
 
+    clock_t t9 = clock();
+
     //FINISHED
-    
-    printf("Run succesful! \n");
+
+    printf("1) Data loading took            %.3f seconds\n", (double)(t1 - t0) / CLOCKS_PER_SEC);
+    printf("2) Instance creation took       %.3f seconds\n", (double)(t2 - t1) / CLOCKS_PER_SEC);
+    printf("3) FlowNet instantiation took   %.3f seconds\n", (double)(t3 - t2) / CLOCKS_PER_SEC);
+    printf("4) Building flow network took   %.3f seconds\n", (double)(t4 - t3) / CLOCKS_PER_SEC);
+    printf("5) FlowOperations instantiation took %.3f seconds\n", (double)(t5 - t4) / CLOCKS_PER_SEC);
+    printf("6) FOCS instantiation took      %.3f seconds\n", (double)(t6 - t5) / CLOCKS_PER_SEC);
+    printf("7) Setting flow_func took       %.3f seconds\n", (double)(t7 - t6) / CLOCKS_PER_SEC);
+    printf("8) FOCS solve took              %.3f seconds\n", (double)(t8 - t7) / CLOCKS_PER_SEC);
+    printf("9) Objective calculation took   %.3f seconds\n", (double)(t9 - t8) / CLOCKS_PER_SEC);
+
+    FILE *out = fopen("timings.csv", "w");
+    if (!out) {
+        perror("fopen timings.csv");
+    } else {
+        // header row
+        fprintf(out,
+            "step,description,seconds\n"
+            "1,Data loading,%.3f\n"
+            "2,Instance creation,%.3f\n"
+            "3,FlowNet instantiation,%.3f\n"
+            "4,Building flow network,%.3f\n"
+            "5,FlowOperations instantiation,%.3f\n"
+            "6,FOCS instantiation,%.3f\n"
+            "7,Setting flow_func,%.3f\n"
+            "8,FOCS solve,%.3f\n"
+            "9,Objective calculation,%.3f\n",
+            (double)(t1 - t0) / CLOCKS_PER_SEC,
+            (double)(t2 - t1) / CLOCKS_PER_SEC,
+            (double)(t3 - t2) / CLOCKS_PER_SEC,
+            (double)(t4 - t3) / CLOCKS_PER_SEC,
+            (double)(t5 - t4) / CLOCKS_PER_SEC,
+            (double)(t6 - t5) / CLOCKS_PER_SEC,
+            (double)(t7 - t6) / CLOCKS_PER_SEC,
+            (double)(t8 - t7) / CLOCKS_PER_SEC,
+            (double)(t9 - t8) / CLOCKS_PER_SEC
+        );
+        fclose(out);
+    }
 
     //free all things
     Py_XDECREF(flowNet);
@@ -160,6 +189,7 @@ int main() {
 }
 
 struct DataHelp getDataC(FILE *data) {
+        clock_t q0 = clock();
         //Get Data in C (this took the longest out of all processes in Python)
         //Ask for filesize
         fseek(data, 0L, SEEK_END);
@@ -240,6 +270,8 @@ struct DataHelp getDataC(FILE *data) {
             row++;
         }
 
+        clock_t q1 = clock();
+
         Py_ssize_t k = PyList_Size(pyRows);       // number of data rows   
         Py_ssize_t n = PyList_Size(pyNames);      // == ncols               
 
@@ -248,6 +280,7 @@ struct DataHelp getDataC(FILE *data) {
             PyObject *empty = PyList_New(0);
             PyList_SetItem(pyCols, c, empty);     // steals ref
         }
+        clock_t q2 = clock();
 
         for (Py_ssize_t r = 0; r < k; ++r) {
             PyObject *rowList = PyList_GetItem(pyRows, r);
@@ -257,10 +290,15 @@ struct DataHelp getDataC(FILE *data) {
                 PyList_Append(colList, cell);              
             }
         }
+        
 
         
         struct DataHelp a = {pyCols, pyNames};
-        
+        clock_t q3 = clock();
         Py_DECREF(pyRows);
+
+        printf("1) a            %.3f seconds\n", (double)(q1 - q0) / CLOCKS_PER_SEC);
+        printf("2) b       %.3f seconds\n", (double)(q2 - q1) / CLOCKS_PER_SEC);
+        printf("3) c   %.3f seconds\n", (double)(q3 - q2) / CLOCKS_PER_SEC);
         return a;
 }

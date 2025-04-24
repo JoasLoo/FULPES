@@ -19,7 +19,7 @@
 #    License along with this library; if not, write to the Free Software
 #    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301
 #    USA
-
+import time
 import networkx as nx
 import copy
 from networkx.algorithms.flow import shortest_augmenting_path
@@ -38,20 +38,21 @@ from itertools import product
 
 import os, sys
 import datetime
-import time
+
 import random
 
 from LP import LP
 from FOCS import FOCS, FlowNet, FlowOperations, FOCSinstance
 from Bookkeeping import Bookkeeping
 
-t0 = time.perf_counter()
+
 
 instanceSize = 10 #number of EVs/jobs in instance
 timeStep = 900 #quarterly granularity
 maxFlowAlg = shortest_augmenting_path #alternatively use e.g., edmonds_karp, preflow_push, or dinitz
 randomSample = True
 
+t0 = time.perf_counter()
 # Real Training data
 instanceData = pd.read_csv('Data/ev_session_data_OR.csv')
 
@@ -63,7 +64,7 @@ if randomSample:
     sample = sorted(random.sample(range(0,len(instanceData)), instanceSize))
     instance = FOCSinstance(instanceData.iloc[sample], timeStep)  
 t2 = time.perf_counter()
-print('How instance is formatted:\n', instanceData.iloc[sample])
+#print('How instance is formatted:\n', instanceData.iloc[sample])
 '''--------------start FOCS--------------'''
 flowNet = FlowNet()
 t3 = time.perf_counter()
