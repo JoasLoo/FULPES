@@ -55,6 +55,7 @@ print('FOCS flow (schedule in middle edge layer): \n', focs.f)*/
 #include <stdio.h>
 #include <stdbool.h>
 #include <stdlib.h>
+#include <string.h>
 #include <math.h>
 
 int instanceSize = 10; //number of EVs/jobs in instance
@@ -70,14 +71,18 @@ void Fail_EXIT(const char *msg)
     exit(EXIT_FAILURE);
 }
 
+PyObject getDataC() {
+    
+}
+
 int main() {
     
-    /*FILE *data; 
+    FILE *data; 
     data = fopen("Data/DEMSdata_FOCS_v1.csv","r"); //open data file in C
     if(data == NULL) { //Check if data file opened succesfully
         printf("Cant open data.csv");
         exit(0);
-    }*/
+    }
 
     //Start Python environment
     Py_Initialize();
@@ -98,6 +103,8 @@ int main() {
     PyObject *getData_func = PyObject_GetAttrString(script, "getData");
     //Get printdata function
     PyObject *printdata_func = PyObject_GetAttrString(script, "printdata");
+    //Get printdata function
+    PyObject *WriteToDataframe_func = PyObject_GetAttrString(script, "WriteToDataframe");
     //Get FOCSinstance class
     PyObject *FOCSinstance_class = PyObject_GetAttrString(FOCS, "FOCSinstance");
     //Get FlowNet class
@@ -110,10 +117,127 @@ int main() {
     if(FOCS_class == NULL || FlowNet_class == NULL || FOCSinstance_class == NULL || getData_func == NULL) {
         Fail_EXIT("Couldn't read some class or function thing");
     }
-    //GET DATA
-    PyObject *instanceData = PyObject_CallObject(getData_func, NULL);
-    if (!instanceData) Fail_EXIT("getData failed");
+    //GET DATA //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     
+    //PyObject *instanceData = PyObject_CallObject(getData_func, NULL);
+    //if (!instanceData) Fail_EXIT("getData failed");
+
+    //Get Data in C (this took the longest out of all processes in Python)
+        //Ask for filesize
+        fseek(data, 0L, SEEK_END);
+        long sz = ftell(data);
+        // Go back to start
+        rewind(data);
+        //allocate space
+        int line_max = ceil(sz/instanceSize);
+        char buffer[line_max];
+
+        PyObject *pyRows  = PyList_New(0);        /* row‑oriented container  */
+        PyObject *pyNames = NULL;                 /* column names            */
+
+        int row = 0;
+        int ncols = 0;
+
+        while(fgets(buffer, sz, data) && row <= instanceSize) {
+            buffer[strcspn(buffer, "\r\n")] = '\0';   /* strip newline */
+            
+            if (buffer[0] == ',') {
+                // shift the whole string one position to the right
+                memmove(buffer + strlen("Unnamed: 0"), buffer, line_max - strlen("Unnamed: 0") + 1);  // +1 for the '\0' character
+
+                // Now set the first part of the buffer to "Unnamed: 0,"
+                strncpy(buffer, "Unnamed: 0,", strlen("Unnamed: 0,"));
+            }      
+
+            char *value = strtok(buffer, ",");     
+
+            if (row == 0) {                       /* ---------- header row -------- */
+                pyNames = PyList_New(0);
+
+                while (value) {
+                    PyObject *s = PyUnicode_FromString(value);
+                    PyList_Append(pyNames, s);
+                    Py_DECREF(s);
+                    ++ncols;
+                    value = strtok(NULL, ",");
+                }
+            }
+            else {                              /* ---------- data row ---------- */
+                PyObject *pyRow = PyList_New(0);
+                int col = 0;
+        
+                while (value && col < ncols) {      /* use ncols from header */
+                    PyObject *val;
+                    char *endptr;
+
+                    // try integer conversion
+                    long ival = strtol(value, &endptr, 10);
+                    if (*endptr == '\0') {
+                        // whole string was an integer
+                        val = PyLong_FromLong(ival);
+                    } else {
+                        // not a pure int, try float
+                        double dval = strtod(value, &endptr);
+                        if (*endptr == '\0') {
+                            val = PyFloat_FromDouble(dval);
+                        } else {
+                            // fallback to string
+                            val = PyUnicode_FromString(value);
+                        }
+                    }
+
+                    PyList_Append(pyRow, val);
+                    Py_DECREF(val);
+
+                    value = strtok(NULL, ",");
+                    ++col;
+                }
+        
+                if (col != ncols)
+                    Fail_EXIT("row has wrong column count");
+        
+                PyList_Append(pyRows, pyRow);
+                Py_DECREF(pyRow);
+            }
+        
+            row++;
+        }
+
+        PyObject_CallObject(printdata_func, PyTuple_Pack(1, pyNames)); //Print the data obtained
+
+        Py_ssize_t k = PyList_Size(pyRows);       // number of data rows   
+        Py_ssize_t n = PyList_Size(pyNames);      // == ncols               
+
+        PyObject *pyCols = PyList_New(n);         // list of n empty lists  
+        for (Py_ssize_t c = 0; c < n; ++c) {
+            PyObject *empty = PyList_New(0);
+            PyList_SetItem(pyCols, c, empty);     // steals ref
+        }
+
+        for (Py_ssize_t r = 0; r < k; ++r) {
+            PyObject *rowList = PyList_GetItem(pyRows, r);
+            for (Py_ssize_t c = 0; c < n; ++c) {
+                PyObject *cell = PyList_GetItem(rowList, c);
+                PyObject *colList = PyList_GetItem(pyCols, c);
+                PyList_Append(colList, cell);                
+            }
+        }
+
+        
+        Py_DECREF(pyRows);
+
+
+        //strncpy(names, buffer, line_max);
+        //printf("%s", names);
+        //strncpy(DataArray[row], buffer, line_max);
+        //printf("%s", DataArray[row]);
+        
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    //Fail_EXIT("temp exit");
+    //Convert to Python object to save
+    PyObject *dataArgs = PyTuple_Pack(2, pyCols, pyNames);
+    PyObject *instanceData = PyObject_CallObject(WriteToDataframe_func, dataArgs);
+
     //Printdata
     PyObject_CallObject(printdata_func, PyTuple_Pack(1, instanceData)); //Print the data obtained
     
@@ -176,8 +300,9 @@ int main() {
     Py_XDECREF(sap);
     Py_XDECREF(nx);
     Py_XDECREF(focs);
+    Py_XDECREF(dataArgs);
     
-
+    Py_XDECREF(WriteToDataframe_func);
     Py_XDECREF(instanceData);
     Py_XDECREF(FOCS_class);
     Py_XDECREF(FlowOperations_class);
@@ -189,7 +314,7 @@ int main() {
     Py_XDECREF(FOCS);
     Py_Finalize();
     //close the csv
-    //fclose(data);
+    fclose(data);
     return 0;
 }
 
