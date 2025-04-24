@@ -733,6 +733,7 @@ class FOCS:
         while not self.terminate:
             #begin round
             #initiate capacities
+            #print("Still working \n")
             if self.it == 0:
                 G_rk = copy.deepcopy(self.G_r)
             G_rk = self.update_network_capacities_g(G_rk, self.flow_val)

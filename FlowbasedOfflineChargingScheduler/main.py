@@ -53,7 +53,7 @@ maxFlowAlg = shortest_augmenting_path #alternatively use e.g., edmonds_karp, pre
 randomSample = True
 
 # Real Training data
-instanceData = pd.read_excel('../Data/ev_session_data_OR.xlsx')
+instanceData = pd.read_csv('Data/ev_session_data_OR.csv')
 
 t1 = time.perf_counter()
 
@@ -63,6 +63,7 @@ if randomSample:
     sample = sorted(random.sample(range(0,len(instanceData)), instanceSize))
     instance = FOCSinstance(instanceData.iloc[sample], timeStep)  
 t2 = time.perf_counter()
+print('How instance is formatted:\n', instanceData.iloc[sample])
 '''--------------start FOCS--------------'''
 flowNet = FlowNet()
 t3 = time.perf_counter()
@@ -80,7 +81,7 @@ t8 = time.perf_counter()
 obj_val = focs.objective()
 t9  = time.perf_counter()
 print('FOCS objective value = ', obj_val)
-print('FOCS flow (schedule in middle edge layer): \n', focs.f)
+#print('FOCS flow (schedule in middle edge layer): \n', focs.f)
 
 print(f"1) Data loading took            {t1 - t0:.3f} seconds")
 print(f"2) Instance creation took       {t2 - t1:.3f} seconds")
