@@ -696,17 +696,22 @@ class FOCS:
         self.global_cap_active = instance.global_cap_active
 
         self.I_crit = [] #end of each round, save the list of active intervals here
-        self.J = instance.J #per interval, specify a list of jobs available
-        self.J_inverse = instance.J_inverse #per job, specify which intervals it is available
+        #self.J = instance.J #per interval, specify a list of jobs available
+        #self.J_inverse = instance.J_inverse #per job, specify which intervals it is available
         self.rd = 0 #round counter
         self.it = 0 #iteration counter
         self.terminate = False
         self.G = flowNet.G
         self.G_r = self.G
-        self.total_demand_r = sum([self.G_r["s"]["j{}".format(j)]["capacity"] for j in self.instance.jobs])
+        #print(self.G_r)
+        self.total_demand_r = self.calculate_total_demand_r() # sum([self.G_r["s"]["j{}".format(j)]["capacity"] for j in self.instance.jobs])
         self.flow_func = shortest_augmenting_path #(or e.g., edmonds_karp)
         self.flow_val = 0
         self.f = flowOp.empty_flow(self.G)
+
+    def calculate_total_demand_r(self):
+        """Calculate total demand from the flow network."""
+        return sum([self.G_r["s"]["j{}".format(j)]["capacity"] for j in self.instance.jobs])
 
     #update network capacities (g function in paper)
     def update_network_capacities_g(self,G_r,flow_val): #doesn't have to be same G_r as in self. May be G_rk
@@ -806,7 +811,7 @@ class FOCS:
                 self.it += 1
 
         return self.f
-    
+    #########################################################
     def solve_segmented_focs(self, err = 0.0000001, MPCstopper = False, MPCcondition = 0):
         while not self.terminate:
             #begin round

@@ -1,15 +1,15 @@
-#include <Python.h>
-#include <stdio.h>
-#include <stdbool.h>
-#include <stdlib.h>
-#include <string.h>
-#include <math.h>
-#include <time.h>
+#include "link.h"
 
-int instanceSize = 500; //number of EVs/jobs in instance
+
+const int instanceSize = 500; //number of EVs/jobs in instance
 int timeStep = 900; //quarterly granularity
-//maxFlowAlg = shortest_augmenting_path #alternatively use e.g., edmonds_karp, preflow_push, or dinitz
+
+//PyObject *maxFlowAlg = shortest_augmenting_path;  // #alternatively use e.g., edmonds_karp, preflow_push, or dinitz
 bool randomSample = true;
+
+PyObject *empty_flow_func = NULL;
+PyObject *calculate_total_demand_r_func = NULL;
+
 
 void Fail_EXIT(const char *msg)
 {
@@ -26,10 +26,13 @@ struct DataHelp {
 
 
 struct DataHelp getDataC(FILE *data);
+int extract_unique_sorted_times(struct DataHelp data, int *FOCS_breakpoints);
 
 
 int main() {
-    
+
+    int *FOCS_breakpoints = calloc(instanceSize * 2, sizeof(int));
+
     FILE *data; 
     data = fopen("Data/ev_session_data_OR.csv","r"); //open data file in C DEMSdata_FOCS_v1.csv ev_session_data_OR.csv
     if(data == NULL) { //Check if data file opened succesfully
@@ -59,11 +62,19 @@ int main() {
     PyObject *FlowNet_class = PyObject_GetAttrString(FOCS, "FlowNet");
     PyObject *FlowOperations_class = PyObject_GetAttrString(FOCS, "FlowOperations");
     PyObject *FOCS_class = PyObject_GetAttrString(FOCS, "FOCS");
+   
     
     clock_t t0 = clock();
     //Get data
     struct DataHelp dataToSolve = getDataC(data);
     clock_t t1 = clock();
+
+    //test part////////////////////////////////////////
+
+    int counter = extract_unique_sorted_times(dataToSolve, FOCS_breakpoints);
+
+    //////////////////////////////////////////////////
+
     //Convert to Python object to save
     PyObject *dataArgs = PyTuple_Pack(2, dataToSolve.Cols, dataToSolve.Names);
     PyObject *instanceData = PyObject_CallObject(WriteToDataframe_func, dataArgs);
@@ -77,7 +88,7 @@ int main() {
     Py_DECREF(focsInstArgs);
     clock_t t3 = clock();
     //Build Flownet
-    PyObject *flowNet   = PyObject_CallObject(FlowNet_class, NULL);
+    PyObject *flowNet = PyObject_CallObject(FlowNet_class, NULL);
     clock_t t4 = clock();
     //call FlowNet.focs_instance_to_network
     PyObject *ret = PyObject_CallMethod(flowNet, "focs_instance_to_network", "O", instance);
@@ -87,9 +98,14 @@ int main() {
     PyObject *flowOpArgs = Py_BuildValue("(OO)", graphG, instance);
     PyObject *flowOp = PyObject_CallObject(FlowOperations_class, flowOpArgs);
     clock_t t6 = clock();
+    empty_flow_func = PyObject_GetAttrString(flowOp, "empty_flow");
+    
     //Run FOCS
     PyObject *focsArgs = Py_BuildValue("(OOO)", instance, flowNet, flowOp);
     PyObject *focs = PyObject_CallObject(FOCS_class, focsArgs);
+    calculate_total_demand_r_func = PyObject_GetAttrString(focs, "calculate_total_demand_r");
+    init_FOCS(instance, flowNet, flowOp, counter);
+    solve_focs_C();
     clock_t t7 = clock();
     //Set MaxFlowAlgorithm to shortest_augmenting_path
     PyObject *nx = PyImport_ImportModule("networkx.algorithms.flow");
@@ -99,8 +115,6 @@ int main() {
     }
 
     PyObject *solve_ret = PyObject_CallMethod(focs, "solve_focs", NULL);
-
-    if(!solve_ret) Fail_EXIT("solve_focs failed\n");
     
     clock_t t8 = clock();
 
@@ -117,15 +131,15 @@ int main() {
 
     //FINISHED
 
-    printf("1) Data loading took            %.3f seconds\n", (double)(t1 - t0) / CLOCKS_PER_SEC);
-    printf("2) Instance creation took       %.3f seconds\n", (double)(t2 - t1) / CLOCKS_PER_SEC);
-    printf("3) FlowNet instantiation took   %.3f seconds\n", (double)(t3 - t2) / CLOCKS_PER_SEC);
-    printf("4) Building flow network took   %.3f seconds\n", (double)(t4 - t3) / CLOCKS_PER_SEC);
-    printf("5) FlowOperations instantiation took %.3f seconds\n", (double)(t5 - t4) / CLOCKS_PER_SEC);
-    printf("6) FOCS instantiation took      %.3f seconds\n", (double)(t6 - t5) / CLOCKS_PER_SEC);
-    printf("7) Setting flow_func took       %.3f seconds\n", (double)(t7 - t6) / CLOCKS_PER_SEC);
-    printf("8) FOCS solve took              %.3f seconds\n", (double)(t8 - t7) / CLOCKS_PER_SEC);
-    printf("9) Objective calculation took   %.3f seconds\n", (double)(t9 - t8) / CLOCKS_PER_SEC);
+    printf("1) Data loading took            %.5f seconds\n", (double)(t1 - t0) / CLOCKS_PER_SEC);
+    printf("2) Instance creation took       %.5f seconds\n", (double)(t2 - t1) / CLOCKS_PER_SEC);
+    printf("3) FlowNet instantiation took   %.5f seconds\n", (double)(t3 - t2) / CLOCKS_PER_SEC);
+    printf("4) Building flow network took   %.5f seconds\n", (double)(t4 - t3) / CLOCKS_PER_SEC);
+    printf("5) FlowOperations instantiation took %.5f seconds\n", (double)(t5 - t4) / CLOCKS_PER_SEC);
+    printf("6) FOCS instantiation took      %.5f seconds\n", (double)(t6 - t5) / CLOCKS_PER_SEC);
+    printf("7) Setting flow_func took       %.5f seconds\n", (double)(t7 - t6) / CLOCKS_PER_SEC);
+    printf("8) FOCS solve took              %.5f seconds\n", (double)(t8 - t7) / CLOCKS_PER_SEC);
+    printf("9) Objective calculation took   %.5f seconds\n", (double)(t9 - t8) / CLOCKS_PER_SEC);
 
     FILE *out = fopen("timings.csv", "w");
     if (!out) {
@@ -134,15 +148,15 @@ int main() {
         // header row
         fprintf(out,
             "step,description,seconds\n"
-            "1,Data loading,%.3f\n"
-            "2,Instance creation,%.3f\n"
-            "3,FlowNet instantiation,%.3f\n"
-            "4,Building flow network,%.3f\n"
-            "5,FlowOperations instantiation,%.3f\n"
-            "6,FOCS instantiation,%.3f\n"
-            "7,Setting flow_func,%.3f\n"
-            "8,FOCS solve,%.3f\n"
-            "9,Objective calculation,%.3f\n",
+            "1,Data loading,%.5f\n"
+            "2,Instance creation,%.5f\n"
+            "3,FlowNet instantiation,%.5f\n"
+            "4,Building flow network,%.5f\n"
+            "5,FlowOperations instantiation,%.5f\n"
+            "6,FOCS instantiation,%.5f\n"
+            "7,Setting flow_func,%.5f\n"
+            "8,FOCS solve,%.5f\n"
+            "9,Objective calculation,%.5f\n",
             (double)(t1 - t0) / CLOCKS_PER_SEC,
             (double)(t2 - t1) / CLOCKS_PER_SEC,
             (double)(t3 - t2) / CLOCKS_PER_SEC,
@@ -172,6 +186,7 @@ int main() {
     Py_DECREF(dataToSolve.Cols);
     Py_DECREF(dataToSolve.Names);
     
+    Py_XDECREF(empty_flow_func);
     Py_XDECREF(WriteToDataframe_func);
     Py_XDECREF(instanceData);
     Py_XDECREF(FOCS_class);
@@ -189,7 +204,6 @@ int main() {
 }
 
 struct DataHelp getDataC(FILE *data) {
-        clock_t q0 = clock();
         //Get Data in C (this took the longest out of all processes in Python)
         //Ask for filesize
         fseek(data, 0L, SEEK_END);
@@ -270,7 +284,6 @@ struct DataHelp getDataC(FILE *data) {
             row++;
         }
 
-        clock_t q1 = clock();
 
         Py_ssize_t k = PyList_Size(pyRows);       // number of data rows   
         Py_ssize_t n = PyList_Size(pyNames);      // == ncols               
@@ -280,7 +293,6 @@ struct DataHelp getDataC(FILE *data) {
             PyObject *empty = PyList_New(0);
             PyList_SetItem(pyCols, c, empty);     // steals ref
         }
-        clock_t q2 = clock();
 
         for (Py_ssize_t r = 0; r < k; ++r) {
             PyObject *rowList = PyList_GetItem(pyRows, r);
@@ -294,11 +306,62 @@ struct DataHelp getDataC(FILE *data) {
 
         
         struct DataHelp a = {pyCols, pyNames};
-        clock_t q3 = clock();
         Py_DECREF(pyRows);
-
-        printf("1) a            %.3f seconds\n", (double)(q1 - q0) / CLOCKS_PER_SEC);
-        printf("2) b       %.3f seconds\n", (double)(q2 - q1) / CLOCKS_PER_SEC);
-        printf("3) c   %.3f seconds\n", (double)(q3 - q2) / CLOCKS_PER_SEC);
         return a;
+}
+
+
+int compare_ints(const void *a, const void *b) {
+    return (*(int *)a - *(int *)b);
+}
+
+int extract_unique_sorted_times(struct DataHelp data, int *FOCS_breakpoints) {
+    // Find indices of "t0_timeStep" and "t1_timeStep" columns
+    char t0_name[10];
+    char t1_name[10];
+    snprintf(t0_name, sizeof(t0_name), "t0_%d", timeStep);
+    snprintf(t1_name, sizeof(t1_name), "t1_%d", timeStep);
+
+    Py_ssize_t ncols = PyList_Size(data.Names);
+    int t0_index = -1, t1_index = -1;
+    for (Py_ssize_t i = 0; i < ncols; i++) {    //find the columns which contain t0_timestep and t1_timestep 
+        PyObject *name = PyList_GetItem(data.Names, i);  // Borrowed reference
+        const char *cname = PyUnicode_AsUTF8(name);
+        if (strcmp(cname, t0_name) == 0) {  //if strings equal, we have found the integer.
+            t0_index = i;
+        } else if (strcmp(cname, t1_name) == 0) {
+            t1_index = i;
+        }
+    }
+
+    if (t0_index == -1 || t1_index == -1) {
+        Fail_EXIT("t0_timeStep or t1_timeStep column not found");
+    }
+
+    // Get the column lists
+    PyObject *t0_col = PyList_GetItem(data.Cols, t0_index);
+    PyObject *t1_col = PyList_GetItem(data.Cols, t1_index);
+
+    // Allocate array: 2 * instanceSize ints
+    int times[instanceSize*2];
+    int counter = 0;
+
+    for (int i = 0; i < instanceSize; i++) {
+        PyObject *item0 = PyList_GetItem(t0_col, i);
+        PyObject *item1 = PyList_GetItem(t1_col, i);
+        times[2 * i] = (int)PyLong_AsLong(item0);   //put the numbers in the 'times' array
+        times[2 * i + 1] = (int)PyLong_AsLong(item1);
+    }
+
+    // Sort the array
+    qsort(times, 2 * instanceSize, sizeof(int), compare_ints);
+
+    FOCS_breakpoints[counter++] = times[0];
+
+    for (int i = 1; i < instanceSize*2; i++) {
+        if (times[i] != times[i - 1]) {
+            FOCS_breakpoints[counter++] = times[i];
+        }        
+    }
+    return counter;
 }
