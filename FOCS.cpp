@@ -17,7 +17,7 @@ PyObject *G_rk;
 PyObject *total_demand_r;
 double *flow_val;
 PyObject *f;
-//CSR
+
 //https://www.youtube.com/watch?v=tq3zPnrQIpU What are graphs
 //https://www.youtube.com/watch?v=nvRkFi8rbOM graphs in C and C++ (replacement for G, G_r and G_rk)
 //We have about a 4% coverage of edges (meaning that if we were to make an Adjacency matrix, only 4% of it would be fully useful), therefore we use an Adjacency list.
