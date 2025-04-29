@@ -1,4 +1,5 @@
 #include "link.h"
+using namespace std;
 
 
 const int instanceSize = 500; //number of EVs/jobs in instance
@@ -9,6 +10,8 @@ bool randomSample = true;
 
 PyObject *empty_flow_func = NULL;
 PyObject *calculate_total_demand_r_func = NULL;
+
+vector<int> FOCS_breakpoints;
 
 
 void Fail_EXIT(const char *msg)
@@ -26,13 +29,10 @@ struct DataHelp {
 
 
 struct DataHelp getDataC(FILE *data);
-int extract_unique_sorted_times(struct DataHelp data, int *FOCS_breakpoints);
+int extract_unique_sorted_times(struct DataHelp data);
 
 
 int main() {
-
-    int *FOCS_breakpoints = calloc(instanceSize * 2, sizeof(int));
-
     FILE *data; 
     data = fopen("Data/ev_session_data_OR.csv","r"); //open data file in C DEMSdata_FOCS_v1.csv ev_session_data_OR.csv
     if(data == NULL) { //Check if data file opened succesfully
@@ -71,7 +71,7 @@ int main() {
 
     //test part////////////////////////////////////////
 
-    int counter = extract_unique_sorted_times(dataToSolve, FOCS_breakpoints);
+    int counter = extract_unique_sorted_times(dataToSolve);
 
     //////////////////////////////////////////////////
 
@@ -125,9 +125,9 @@ int main() {
     double obj_val = PyFloat_AsDouble(objValPy);
     Py_DECREF(objValPy);
 
-    printf("Objective value = %.9f\n", obj_val);
-
     clock_t t9 = clock();
+
+    printf("Objective value = %.9f\n", obj_val);
 
     //FINISHED
 
@@ -315,7 +315,7 @@ int compare_ints(const void *a, const void *b) {
     return (*(int *)a - *(int *)b);
 }
 
-int extract_unique_sorted_times(struct DataHelp data, int *FOCS_breakpoints) {
+int extract_unique_sorted_times(struct DataHelp data) {
     // Find indices of "t0_timeStep" and "t1_timeStep" columns
     char t0_name[10];
     char t1_name[10];
@@ -356,11 +356,11 @@ int extract_unique_sorted_times(struct DataHelp data, int *FOCS_breakpoints) {
     // Sort the array
     qsort(times, 2 * instanceSize, sizeof(int), compare_ints);
 
-    FOCS_breakpoints[counter++] = times[0];
+    FOCS_breakpoints.push_back(times[0]);
 
     for (int i = 1; i < instanceSize*2; i++) {
         if (times[i] != times[i - 1]) {
-            FOCS_breakpoints[counter++] = times[i];
+            FOCS_breakpoints.push_back(times[i]);;
         }        
     }
     return counter;

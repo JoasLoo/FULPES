@@ -1,16 +1,14 @@
 #include "link.h"
-
+using namespace std;
 //Creating some global variables to save a FOCS instance.
 PyObject *instance;
 PyObject *flowNet; 
 PyObject *flowOp;
-int *I_p = NULL;    //temp array to store where we are. If empty, done.
-int *I_a = NULL;    //array counting from 0 to N, where N is the length of: sorted non-double values from t0_<timestep> and t1_<timestep> columns
+vector<int> I_p;    //temp array to store where we are. If empty, done.
+vector<int> I_a;    //array counting from 0 to N, where N is the length of: sorted non-double values from t0_<timestep> and t1_<timestep> columns
 bool global_cap_active; 
 
-int *I_crit = NULL;
-int I_crit_size = 1; // Number of elements currently in I_crit
-int I_crit_capacity = 1; // Initial capacity of I_crit
+vector<int> I_crit;
 char flow_func[] = "shortest_augmenting_path";
 
 PyObject *G;    //initialized from python
@@ -39,13 +37,11 @@ void update_I_crit();
         instance = instance_obtained;
         flowNet = flowNet_obtained;
         flowOp = flowOp_obtained;
-        I_p = (int *)malloc((I_a_count - 1) * sizeof(int));
-        I_a = (int *)malloc((I_a_count - 1) * sizeof(int));
+        //no need to init space for I_a, I_p and I_crit because theyre global vectors.
         for (int j = 0; j < I_a_count - 1; j++) {
             I_a[j] = j;
         }
         global_cap_active = false;
-        I_crit = (int *)malloc((I_crit_size) * sizeof(int));
         G = PyObject_GetAttrString(flowNet, "G");
         G_r = G;
         //total_demand_r = PyObject_CallObject(calculate_total_demand_r_func, PyTuple_Pack(1, G_r));
@@ -165,12 +161,4 @@ void update_I_crit();
             while (!terminate) {
                 terminate = true;
             }
-        }
-
-
-
-        void update_I_crit(int interval) {
-            I_crit_capacity = I_crit_capacity + interval;
-            I_crit = realloc(I_crit, I_crit_capacity * sizeof(int));
-            I_crit[I_crit_size++] = interval;
         }

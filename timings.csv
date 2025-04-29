@@ -5,6 +5,6 @@ step,description,seconds
 4,Building flow network,0.00000
 5,FlowOperations instantiation,0.04400
 6,FOCS instantiation,0.00000
-7,Setting flow_func,0.00300
-8,FOCS solve,0.61800
-9,Objective calculation,0.00100
+7,Setting flow_func,0.00200
+8,FOCS solve,0.62700
+9,Objective calculation,0.00000
