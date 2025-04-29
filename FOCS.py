@@ -501,6 +501,7 @@ class FOCSinstance:
 class FlowNet:
     def __init__(self):
         self.G = nx.DiGraph()
+        
 
     def focs_instance_to_network(self, instance):
         #add nodes
@@ -513,6 +514,7 @@ class FlowNet:
                         +  sum([[("j"+str(j), "i"+str(i), {"capacity": instance.jobs_cap[instance.jobs.index(j)]*instance.len_i[i]/instance.timeBase}) for i in instance.J_inverse["j"+str(j)]] for j in instance.jobs],[])   #D_0
                         +  [("i"+str(i), "t") for i in instance.I_a] #D_t
                         )
+        print(self.G)
         
     def focs_solution_to_network(self, instance, f, err = 0.000001, how = 'linear', factor = 1000, structure = "focs"):
         #make empty network

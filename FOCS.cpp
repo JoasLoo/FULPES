@@ -13,10 +13,27 @@ char flow_func[] = "shortest_augmenting_path";
 
 PyObject *G;    //initialized from python
 PyObject *G_r;  //initialized from python
+PyObject *G_rk;
 PyObject *total_demand_r;
 double *flow_val;
 PyObject *f;
 //CSR
+//https://www.youtube.com/watch?v=tq3zPnrQIpU What are graphs
+//https://www.youtube.com/watch?v=nvRkFi8rbOM graphs in C and C++ (replacement for G, G_r and G_rk)
+//We have about a 4% coverage of edges (meaning that if we were to make an Adjacency matrix, only 4% of it would be fully useful), therefore we use an Adjacency list.
+//For each list item we want to have the int FROM, int TO, int capacity, int usage? More??
+//Functions: Init, add_flow, init_focs? (??), reduce_network (??), length_sum_intervals (??), partial_flow (??), calculate_total_demand_r (??).
+// all with (??) I have to figure out what it does and why.
+//For faster reading: Maybe a sort function? so that the list is sorted based on the FROM or TO int?
+//TODO: Make a struct for the digraph
+//TODO: Make a vector of the struct
+//TODO: Create the functions that are known
+//TODO: Find out what the unknown functions should do
+//TODO: Make unknown functions.
+//TODO: Find out what instance is about.
+//TODO: Implement instance in C
+
+//When all these TODO's are done, the code should be sped up sufficiently, then try to implement multithreading.
 
 bool terminate = false;
 int rd; //Round counter
@@ -159,6 +176,28 @@ void update_I_crit();
 
         void solve_focs_C() {
             while (!terminate) {
+                // begin round
+                if(it == 0) {
+                    G_rk = G_r;
+                }
+                update_network_capacities_g(G_rk);
+
+                // determine max flow
+
+                if(PyLong_AsDouble(total_demand_r)-*flow_val < err) {
+                    // end the round
+                    if (I_p.size() == 0) {
+                        // terminate
+                        terminate = true;
+                        //f = flowOp.addflows? //in python first, later will make in C++
+                    }
+                    else {
+                        // determine critical flow
+                    }
+                }
+                else {
+                    // initiate next iteration
+                }
                 terminate = true;
             }
         }

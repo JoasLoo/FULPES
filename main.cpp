@@ -2,7 +2,7 @@
 using namespace std;
 
 
-const int instanceSize = 500; //number of EVs/jobs in instance
+const int instanceSize = 600; //number of EVs/jobs in instance
 int timeStep = 900; //quarterly granularity
 
 //PyObject *maxFlowAlg = shortest_augmenting_path;  // #alternatively use e.g., edmonds_karp, preflow_push, or dinitz
@@ -105,7 +105,7 @@ int main() {
     PyObject *focs = PyObject_CallObject(FOCS_class, focsArgs);
     calculate_total_demand_r_func = PyObject_GetAttrString(focs, "calculate_total_demand_r");
     init_FOCS(instance, flowNet, flowOp, counter);
-    solve_focs_C();
+    //solve_focs_C();
     clock_t t7 = clock();
     //Set MaxFlowAlgorithm to shortest_augmenting_path
     PyObject *nx = PyImport_ImportModule("networkx.algorithms.flow");
