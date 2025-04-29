@@ -18,7 +18,7 @@ PyObject *G_r;  //initialized from python
 PyObject *total_demand_r;
 double *flow_val;
 PyObject *f;
-
+//CSR
 
 bool terminate = false;
 int rd; //Round counter
