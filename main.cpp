@@ -34,7 +34,7 @@ struct DataHelp {
 
 
 struct DataHelp getDataC(FILE *data);
-vector<vector<string>> opendata_toC(const string& filename);
+InstanceData opendata_toC(const string& filename);
 int extract_unique_sorted_times(struct DataHelp data);
 
 
@@ -77,7 +77,7 @@ int main() {
 
     //test part///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    vector<vector<string>> instance1 = opendata_toC("Data/ev_session_data_OR.csv");
+    InstanceData instance1 = opendata_toC("Data/DEMSdata_FOCS_v1.csv");
 
     int counter = extract_unique_sorted_times(dataToSolve);
 
@@ -326,14 +326,15 @@ struct DataHelp getDataC(FILE *data) {
         return a;
 }
 
-vector<vector<string>> opendata_toC(const string& filename) {   //copied from: https://medium.com/@ryan_forrester_/reading-csv-files-in-c-how-to-guide-35030eb378ad
+InstanceData opendata_toC(const string& filename) {   //copied from: https://medium.com/@ryan_forrester_/reading-csv-files-in-c-how-to-guide-35030eb378ad
 
+    InstanceData instance1;
     vector<vector<string>> data;
     ifstream file(filename);
 
     if (!file.is_open()) {
         cerr << "Failed to open file: " << filename << endl;
-        return data;
+        return instance1;
     }
 
     string line;
@@ -366,18 +367,17 @@ vector<vector<string>> opendata_toC(const string& filename) {   //copied from: h
         datainCols.push_back(col);
     }
 
-    //data[0][i] contains the names which we want to read.
+    if (headers[0] == "") {
+        headers[0] = "Unnamed: 0";
+    }
 
-    InstanceData instance1;
     for (int i = 0; i < data[0].size(); i++) { 
         instance1.add_column(headers[i], datainCols[i]);
         cout << headers[i] << " " << datainCols[i][0] << "\n";
     }
     
-
-
     file.close();
-    return data;
+    return instance1;
 }
 
 int compare_ints(const void *a, const void *b) {
