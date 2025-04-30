@@ -1,12 +1,6 @@
 #include "graphs.h"
 #include <Python.h>
-#include <stdio.h>
-#include <vector>
-#include <stdbool.h>
-#include <stdlib.h>
-#include <string.h>
-#include <math.h>
-#include <time.h>
+
 
 extern PyObject *empty_flow_func;
 extern PyObject *calculate_total_demand_r_func;

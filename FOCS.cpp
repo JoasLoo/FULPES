@@ -20,7 +20,6 @@ PyObject *f;
 
 //https://www.youtube.com/watch?v=tq3zPnrQIpU What are graphs
 //https://www.youtube.com/watch?v=nvRkFi8rbOM graphs in C and C++ (replacement for G, G_r and G_rk)
-//We have about a 4% coverage of edges (meaning that if we were to make an Adjacency matrix, only 4% of it would be fully useful), therefore we use an Adjacency list.
 //For each list item we want to have the int FROM, int TO, int capacity, int usage? More??
 //Functions: Init, add_flow, init_focs? (??), reduce_network (??), length_sum_intervals (??), partial_flow (??), calculate_total_demand_r (??).
 // all with (??) I have to figure out what it does and why.
@@ -35,7 +34,7 @@ PyObject *f;
 
 //When all these TODO's are done, the code should be sped up sufficiently, then try to implement multithreading.
 
-bool terminate = false;
+bool stop = false;
 int rd; //Round counter
 int it; //iteration counter
 
@@ -50,7 +49,7 @@ void update_I_crit();
     void init_FOCS( PyObject *instance_obtained, PyObject *flowNet_obtained, PyObject *flowOp_obtained, int I_a_count) {
         rd = 0; 
         it = 0;
-        terminate = false;
+        stop = false;
         instance = instance_obtained;
         flowNet = flowNet_obtained;
         flowOp = flowOp_obtained;
@@ -188,7 +187,7 @@ void update_I_crit();
                     // end the round
                     if (I_p.size() == 0) {
                         // terminate
-                        terminate = true;
+                        stop = true;
                         //f = flowOp.addflows? //in python first, later will make in C++
                     }
                     else {
@@ -198,6 +197,6 @@ void update_I_crit();
                 else {
                     // initiate next iteration
                 }
-                terminate = true;
+                stop = true;
             }
         }

@@ -1,8 +1,13 @@
 #include "link.h"
+#include <iostream>
+#include <fstream>
+#include <sstream>
+#include <vector>
+#include <string>
 using namespace std;
 
 
-const int instanceSize = 600; //number of EVs/jobs in instance
+const int instanceSize = 5; //number of EVs/jobs in instance
 int timeStep = 900; //quarterly granularity
 
 //PyObject *maxFlowAlg = shortest_augmenting_path;  // #alternatively use e.g., edmonds_karp, preflow_push, or dinitz
@@ -29,6 +34,7 @@ struct DataHelp {
 
 
 struct DataHelp getDataC(FILE *data);
+vector<vector<string>> opendata_toC(const string& filename);
 int extract_unique_sorted_times(struct DataHelp data);
 
 
@@ -69,11 +75,21 @@ int main() {
     struct DataHelp dataToSolve = getDataC(data);
     clock_t t1 = clock();
 
-    //test part////////////////////////////////////////
+    //test part///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    vector<vector<string>> instance1 = opendata_toC("Data/ev_session_data_OR.csv");
 
     int counter = extract_unique_sorted_times(dataToSolve);
 
-    //////////////////////////////////////////////////
+    edges e("j1", "i2", 5.1);
+    Graph g(1);
+    g.add_flow(e);
+    g.remove_empty();
+    g.print_graph();
+
+
+
+    /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     //Convert to Python object to save
     PyObject *dataArgs = PyTuple_Pack(2, dataToSolve.Cols, dataToSolve.Names);
@@ -310,12 +326,66 @@ struct DataHelp getDataC(FILE *data) {
         return a;
 }
 
+vector<vector<string>> opendata_toC(const string& filename) {   //copied from: https://medium.com/@ryan_forrester_/reading-csv-files-in-c-how-to-guide-35030eb378ad
+
+    vector<vector<string>> data;
+    ifstream file(filename);
+
+    if (!file.is_open()) {
+        cerr << "Failed to open file: " << filename << endl;
+        return data;
+    }
+
+    string line;
+    while (getline(file, line)) {
+        vector<string> row;
+        stringstream ss(line);
+        string cell;
+
+        while (getline(ss, cell, ',')) {
+            row.push_back(cell);
+        }
+
+        data.push_back(row);
+    }
+
+    vector<vector<string>> datainCols;
+    vector<string> headers;
+
+    for (int i = 0; i < data[0].size(); i++) {
+        vector<string> col;
+        for (int q = 0; q < data.size(); q++) {
+            if (q == 0) {
+                headers.push_back(data[q][i]);
+            }
+            else {
+                col.push_back(data[q][i]);
+            }
+            
+        }
+        datainCols.push_back(col);
+    }
+
+    //data[0][i] contains the names which we want to read.
+
+    InstanceData instance1;
+    for (int i = 0; i < data[0].size(); i++) { 
+        instance1.add_column(headers[i], datainCols[i]);
+        cout << headers[i] << " " << datainCols[i][0] << "\n";
+    }
+    
+
+
+    file.close();
+    return data;
+}
 
 int compare_ints(const void *a, const void *b) {
     return (*(int *)a - *(int *)b);
 }
 
 int extract_unique_sorted_times(struct DataHelp data) {
+
     // Find indices of "t0_timeStep" and "t1_timeStep" columns
     char t0_name[10];
     char t1_name[10];
@@ -365,3 +435,5 @@ int extract_unique_sorted_times(struct DataHelp data) {
     }
     return counter;
 }
+
+
