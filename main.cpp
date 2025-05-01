@@ -78,6 +78,7 @@ int main() {
     //test part///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     InstanceData instance1 = opendata_toC("Data/DEMSdata_FOCS_v1.csv");
+    //vector<double> powers = instance1.get_double_array("total_energy_Wh");
 
     int counter = extract_unique_sorted_times(dataToSolve);
 
@@ -85,7 +86,9 @@ int main() {
     Graph g(1);
     g.add_flow(e);
     g.remove_empty();
-    g.print_graph();
+    //g.print_graph();
+
+    g.init_focs(instance1, timeStep, instanceSize, randomSample, counter);
 
 
 
@@ -326,6 +329,11 @@ struct DataHelp getDataC(FILE *data) {
         return a;
 }
 
+bool starts_with(const std::string& str, const std::string& prefix) {
+    return str.size() >= prefix.size() &&
+           std::equal(prefix.begin(), prefix.end(), str.begin());
+}
+
 InstanceData opendata_toC(const string& filename) {   //copied from: https://medium.com/@ryan_forrester_/reading-csv-files-in-c-how-to-guide-35030eb378ad
 
     InstanceData instance1;
@@ -368,12 +376,28 @@ InstanceData opendata_toC(const string& filename) {   //copied from: https://med
     }
 
     if (headers[0] == "") {
-        headers[0] = "Unnamed: 0";
+        headers[0] = "Unnamed ";
     }
 
     for (int i = 0; i < data[0].size(); i++) { 
-        instance1.add_column(headers[i], datainCols[i]);
-        cout << headers[i] << " " << datainCols[i][0] << "\n";
+        vector<string>& col = datainCols[i];
+        if(starts_with(headers[i], "t0_") || starts_with(headers[i], "t1_") ||
+        headers[i] == "total_energy" || headers[i] == "total_energy_Wh" ||
+        headers[i] == "average_power_W" || headers[i] == "maxPower") {
+            vector<double> col_d;
+            col_d.reserve(col.size());
+            for (const auto& val : col) {
+                try {
+                    col_d.push_back(std::stod(val));
+                } catch (const std::invalid_argument& e) {
+                    col_d.push_back(0.0); // Or handle invalid entries differently
+                }
+            }
+            instance1.add_column(headers[i], move(col_d));
+        }
+
+        instance1.add_column(headers[i], move(datainCols[i]));
+        //cout << headers[i] << " " << datainCols[i][0] << "\n";
     }
     
     file.close();
