@@ -124,6 +124,33 @@ class Graph {
                           << " | cap: " << e.capacity << "\n";
         }
     }
+
+    void find_J_inverse(int timestep) {
+        for (int j = 0; j < jobs.size(); j++) {
+            std::string key = "j" + std::to_string(j);
+            int t0 = t0_x[j];
+            int t1 = t1_x[j];
+    
+            // Find index of t0 in intervals_start
+            auto it_start = std::find(intervals_start.begin(), intervals_start.end(), t0);
+            auto it_end = std::find(intervals_end.begin(), intervals_end.end(), t1);
+    
+            if (it_start != intervals_start.end() && it_end != intervals_end.end()) {
+                int idx_start = std::distance(intervals_start.begin(), it_start);
+                int idx_end = std::distance(intervals_end.begin(), it_end);
+    
+                std::vector<int> indices;
+                for (int i = idx_start; i <= idx_end; ++i) {
+                    indices.push_back(i);
+                }
+    
+                J_inverse[key] = indices;
+            } else {
+                std::cerr << "Error: t0 or t1 not found in interval lists for job " << j << "\n";
+            }
+        }
+    }
+    
     
     void init_focs(InstanceData instance, int timestep, int instancesize, bool randomize, int I_a_count) {
 
@@ -144,7 +171,7 @@ class Graph {
         t0_x = sample_vector_C(instance.get_double_array(t0_name), instancesize, randomize);
         t1_x = sample_vector_C(instance.get_double_array(t1_name), instancesize, randomize);
         
-        n = 0;//average_power_W.size();
+        n = average_power_W.size();
         for (int j = 0; j < n; ++j) {
             jobs.push_back(j);
             if (average_power_W[j] > maxPower[j])
@@ -168,15 +195,18 @@ class Graph {
             len_i.push_back((breakpoints[i+1] - breakpoints[i]) * timestep);
         }
 
+        find_J_inverse(timestep);
+
         //focs_instance_to_network
         for (int j : jobs) {
+            std::cout << j << "\n";
             std::string from = "s";
             std::string to = "j" + std::to_string(j);
             double capacity = jobs_demand[j];
             add_flow(from, to, capacity);  // D_s
         }
         
-        /*for (int j : jobs) {
+        for (int j : jobs) {
             std::string from = "j" + std::to_string(j);
             double cap_j = jobs_cap[j];
             std::string j_key = "j" + std::to_string(j);
@@ -186,7 +216,7 @@ class Graph {
                 double capacity = cap_j * len_i[i] / timeBase;
                 add_flow(from, to, capacity);  // D_0
             }
-        }*/
+        }
         
         for (int i : I_a) {
             std::string from = "i" + std::to_string(i);
@@ -213,6 +243,8 @@ class Graph {
     }
 
     private: 
+    std::unordered_map<std::string, std::vector<int>> J_inverse;
+
     int timeBase = 3600;
     std::vector<int> jobs;
     std::vector<double> jobs_cap;

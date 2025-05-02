@@ -7,11 +7,11 @@
 using namespace std;
 
 
-const int instanceSize = 5; //number of EVs/jobs in instance
+const int instanceSize = 7; //number of EVs/jobs in instance
 int timeStep = 900; //quarterly granularity
 
 //PyObject *maxFlowAlg = shortest_augmenting_path;  // #alternatively use e.g., edmonds_karp, preflow_push, or dinitz
-bool randomSample = true;
+bool randomSample = false;
 
 PyObject *empty_flow_func = NULL;
 PyObject *calculate_total_demand_r_func = NULL;
@@ -40,7 +40,7 @@ int extract_unique_sorted_times(struct DataHelp data);
 
 int main() {
     FILE *data; 
-    data = fopen("Data/ev_session_data_OR.csv","r"); //open data file in C DEMSdata_FOCS_v1.csv ev_session_data_OR.csv
+    data = fopen("Data/DEMSdata_FOCS_v1.csv","r"); //open data file in C DEMSdata_FOCS_v1.csv ev_session_data_OR.csv
     if(data == NULL) { //Check if data file opened succesfully
         printf("Cant open data.csv");
         exit(0);
@@ -82,15 +82,13 @@ int main() {
 
     int counter = extract_unique_sorted_times(dataToSolve);
 
-    edges e("j1", "i2", 5.1);
+    edges e("test1", "test2", 420.69);
     Graph g(1);
     g.add_flow(e);
     g.remove_empty();
-    //g.print_graph();
-
+    
     g.init_focs(instance1, timeStep, instanceSize, randomSample, counter);
-
-
+    g.print_graph();    
 
     /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

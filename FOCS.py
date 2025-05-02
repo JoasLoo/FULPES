@@ -514,9 +514,9 @@ class FlowNet:
                         +  sum([[("j"+str(j), "i"+str(i), {"capacity": instance.jobs_cap[instance.jobs.index(j)]*instance.len_i[i]/instance.timeBase}) for i in instance.J_inverse["j"+str(j)]] for j in instance.jobs],[])   #D_0
                         +  [("i"+str(i), "t") for i in instance.I_a] #D_t
                         )
-        #print(self.G)
-        #for u, v, data in self.G.edges(data=True):
-        #    print(f"From {u} to {v} | cap: {data.get('capacity', 0)}")
+        print(self.G)
+        for u, v, data in self.G.edges(data=True):
+            print(f"From {u} to {v} | cap: {data.get('capacity', 0)}")
         
     def focs_solution_to_network(self, instance, f, err = 0.000001, how = 'linear', factor = 1000, structure = "focs"):
         #make empty network
