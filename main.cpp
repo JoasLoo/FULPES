@@ -7,7 +7,7 @@
 using namespace std;
 
 
-const int instanceSize = 7; //number of EVs/jobs in instance
+const int instanceSize = 70; //number of EVs/jobs in instance
 int timeStep = 900; //quarterly granularity
 
 //PyObject *maxFlowAlg = shortest_augmenting_path;  // #alternatively use e.g., edmonds_karp, preflow_push, or dinitz
@@ -78,17 +78,17 @@ int main() {
     //test part///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     InstanceData instance1 = opendata_toC("Data/DEMSdata_FOCS_v1.csv");
-    //vector<double> powers = instance1.get_double_array("total_energy_Wh");
 
     int counter = extract_unique_sorted_times(dataToSolve);
 
-    edges e("test1", "test2", 420.69);
     Graph g(1);
-    g.add_flow(e);
     g.remove_empty();
     
     g.init_focs(instance1, timeStep, instanceSize, randomSample, counter);
-    g.print_graph();    
+    //g.print_graph();   
+    g.solve_focs();
+    
+    clock_t qx = clock();
 
     /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -120,9 +120,6 @@ int main() {
     //Run FOCS
     PyObject *focsArgs = Py_BuildValue("(OOO)", instance, flowNet, flowOp);
     PyObject *focs = PyObject_CallObject(FOCS_class, focsArgs);
-    calculate_total_demand_r_func = PyObject_GetAttrString(focs, "calculate_total_demand_r");
-    init_FOCS(instance, flowNet, flowOp, counter);
-    //solve_focs_C();
     clock_t t7 = clock();
     //Set MaxFlowAlgorithm to shortest_augmenting_path
     PyObject *nx = PyImport_ImportModule("networkx.algorithms.flow");
@@ -149,7 +146,8 @@ int main() {
     //FINISHED
 
     printf("1) Data loading took            %.5f seconds\n", (double)(t1 - t0) / CLOCKS_PER_SEC);
-    printf("2) Instance creation took       %.5f seconds\n", (double)(t2 - t1) / CLOCKS_PER_SEC);
+    printf("X) ALL C PARTS TOOK            %.5f seconds\n", (double)(qx - t1) / CLOCKS_PER_SEC);
+    printf("2) Instance creation took       %.5f seconds\n", (double)(t2 - qx) / CLOCKS_PER_SEC);
     printf("3) FlowNet instantiation took   %.5f seconds\n", (double)(t3 - t2) / CLOCKS_PER_SEC);
     printf("4) Building flow network took   %.5f seconds\n", (double)(t4 - t3) / CLOCKS_PER_SEC);
     printf("5) FlowOperations instantiation took %.5f seconds\n", (double)(t5 - t4) / CLOCKS_PER_SEC);

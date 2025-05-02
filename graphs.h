@@ -15,6 +15,7 @@
 #include <algorithm>
 #include <random>
 #include <set>
+#include <queue>
 
 inline std::vector<double> sample_vector_C(const std::vector<double>& input, int N, bool randomSample) {
     std::vector<double> result;
@@ -82,10 +83,11 @@ struct edges {
     std::string from;
     std::string to;
     double capacity;
+    double flow;
 
     // Constructor
-    edges() : from(""), to(""), capacity(0) {}
-    edges(std::string f, std::string t, double c) : from(f), to(t), capacity(c) {}
+    edges() : from(""), to(""), capacity(0), flow(0) {}
+    edges(std::string f, std::string t, double c, double fl) : from(f), to(t), capacity(c), flow(fl) {}
 };
 
 class Graph {
@@ -113,7 +115,7 @@ class Graph {
     }
 
     void add_flow(const std::string& from, const std::string& to, double capacity) {
-        edges edge(from, to, capacity);  // default flow is 0
+        edges edge(from, to, capacity, 0);  // default flow is 0
         digraph.push_back(edge);
     }
     
@@ -125,7 +127,24 @@ class Graph {
         }
     }
 
-    void find_J_inverse(int timestep) {
+    void find_J() {
+        for (int i : I_a) {
+            std::string i_key = "i" + std::to_string(i);
+            std::vector<int> related_jobs;
+        
+            for (int j : jobs) {
+                std::string j_key = "j" + std::to_string(j);
+                const auto& job_list = J_inverse[j_key];
+                if (std::find(job_list.begin(), job_list.end(), i) != job_list.end()) {
+                    related_jobs.push_back(j);
+                }
+            }
+        
+            J[i_key] = related_jobs;
+        }        
+    }
+
+    void find_J_inverse() {
         for (int j = 0; j < jobs.size(); j++) {
             std::string key = "j" + std::to_string(j);
             int t0 = t0_x[j];
@@ -152,8 +171,10 @@ class Graph {
     }
     
     
-    void init_focs(InstanceData instance, int timestep, int instancesize, bool randomize, int I_a_count) {
+    
+    void init_focs(InstanceData instance, int timeStep, int instancesize, bool randomize, int I_a_count) {
 
+        timestep = timeStep;
         //init all
         for (int j = 0; j < I_a_count - 1; j++) {
             I_a[j] = j;
@@ -195,11 +216,12 @@ class Graph {
             len_i.push_back((breakpoints[i+1] - breakpoints[i]) * timestep);
         }
 
-        find_J_inverse(timestep);
+        find_J();
+        find_J_inverse();
 
         //focs_instance_to_network
         for (int j : jobs) {
-            std::cout << j << "\n";
+            //std::cout << j << "\n";
             std::string from = "s";
             std::string to = "j" + std::to_string(j);
             double capacity = jobs_demand[j];
@@ -223,7 +245,19 @@ class Graph {
             std::string to = "t";
             double capacity = 0.0;  // If no value is given, use 0 or determine based on context
             add_flow(from, to, capacity);  // D_t
-        }        
+        }       
+        
+        selfterminate = false;
+        digraph_r = digraph;
+    }
+
+    void update_network_capacities_g() {
+        if (it > 0) {
+
+        }
+        else {
+
+        }
     }
     
     void reduce_network() {
@@ -237,12 +271,25 @@ class Graph {
     void partial_flow(){ 
     
     }
+
+    void solve_focs() {
+        while (!selfterminate) {
+            if(it == 0) {
+                digraph_rk = digraph_r;
+            }
+            update_network_capacities_g();
+            //flow_val = shortest_augmenting_path();
+            std::cout << "flow_val = " << flow_val << "\n";
+            selfterminate = true;
+        }
+    }
     
     double calculate_total_demand_r(){ 
         return 0;
     }
 
     private: 
+    std::unordered_map<std::string, std::vector<int>> J;
     std::unordered_map<std::string, std::vector<int>> J_inverse;
 
     int timeBase = 3600;
@@ -265,6 +312,17 @@ class Graph {
     std::vector<double> total_energy;
     std::vector<double> total_energy_Wh;
     std::vector<double> maxPower;
+
+    int timestep;
+    int rd, it;
+    std::vector<edges> digraph_r;
+    std::vector<edges> digraph_rk;
+    double flow_val;
+
+    double err = 0.0000001;
+    bool MPCstopper = false;
+    int MPCcondition = 0;
+    bool selfterminate;
 };
 
 #endif
