@@ -7,7 +7,7 @@
 using namespace std;
 
 
-const int instanceSize = 70; //number of EVs/jobs in instance
+const int instanceSize = 5; //number of EVs/jobs in instance
 int timeStep = 900; //quarterly granularity
 
 //PyObject *maxFlowAlg = shortest_augmenting_path;  // #alternatively use e.g., edmonds_karp, preflow_push, or dinitz

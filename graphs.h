@@ -278,8 +278,16 @@ class Graph {
                 digraph_rk = digraph_r;
             }
             update_network_capacities_g();
-            //flow_val = shortest_augmenting_path();
+            Edmonds_Karp();
+
             std::cout << "flow_val = " << flow_val << "\n";
+
+            if (total_demand_r-flow_val < err) {
+
+            }
+            else {
+                it++;
+            }
             selfterminate = true;
         }
     }
@@ -287,6 +295,82 @@ class Graph {
     double calculate_total_demand_r(){ 
         return 0;
     }
+
+    void Edmonds_Karp() {
+        std::string source = "s";
+        std::string sink = "t";
+        flow_val = 0;
+        digraph_r = digraph;  // reset residual graph
+        std::unordered_map<std::string, std::string> parent;
+    
+        while (bfs(parent, source, sink, digraph_r)) {
+            // Find bottleneck capacity
+            double path_flow = std::numeric_limits<double>::max();
+            for (std::string v = sink; v != source; v = parent[v]) {
+                std::string u = parent[v];
+                for (const edges& e : digraph_r) {
+                    if (e.from == u && e.to == v && e.capacity - e.flow > err) {
+                        path_flow = std::min(path_flow, e.capacity - e.flow);
+                        break;
+                    }
+                }
+            }
+    
+            // Update residual capacities
+            for (std::string v = sink; v != source; v = parent[v]) {
+                std::string u = parent[v];
+                for (edges& e : digraph_r) {
+                    if (e.from == u && e.to == v) {
+                        e.flow += path_flow;
+                        break;
+                    }
+                }
+    
+                // Add reverse edge or update if exists
+                bool found = false;
+                for (edges& e : digraph_r) {
+                    if (e.from == v && e.to == u) {
+                        e.flow -= path_flow;
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found) {
+                    digraph_r.push_back(edges(v, u, 0, -path_flow));
+                }
+            }
+            std::cout << "path_flow " << path_flow << "\n";
+            flow_val += path_flow;
+        }
+    }
+    
+
+    //Breadth First Search
+    bool bfs(std::unordered_map<std::string, std::string>& parent, const std::string& source, const std::string& sink, const std::vector<edges>& graph) {
+        std::unordered_map<std::string, bool> visited;
+        std::queue<std::string> q;
+        q.push(source);
+        visited[source] = true;
+        parent.clear();
+    
+        while (!q.empty()) {
+            std::string u = q.front();
+            q.pop();
+            
+            for (const edges& e : graph) {
+                //std::cout << "u: " << u << " e.from: " << e.from << "\n";
+                if (e.from == u && !visited[e.to] && e.capacity - e.flow > err) {
+                    std::cout << "e.from: " << e.from << " e.to: " << e.to << "\n";
+                    q.push(e.to);
+                    parent[e.to] = u;
+                    visited[e.to] = true;
+                    if (e.to == sink) return true;
+                }
+            }
+        }
+        return false;
+    }
+    
 
     private: 
     std::unordered_map<std::string, std::vector<int>> J;
@@ -323,6 +407,7 @@ class Graph {
     bool MPCstopper = false;
     int MPCcondition = 0;
     bool selfterminate;
+    double total_demand_r = 0;
 };
 
 #endif
