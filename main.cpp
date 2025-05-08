@@ -82,7 +82,7 @@ int main() {
     int counter = extract_unique_sorted_times(dataToSolve);
 
     Graph g(1);
-    g.remove_empty();
+    g.remove_empty(g.digraph);
     
     g.init_focs(instance1, timeStep, instanceSize, randomSample, counter);
     //g.print_graph();   

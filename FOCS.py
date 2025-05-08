@@ -619,7 +619,7 @@ class FlowOperations:
                         temp += flow1[v][u]
                 flow1[u]['t'] = temp
 
-    #Reduce flow network by critical flow
+    #Reduce flow network by critical flow #self.G_r = self.flowOp.reduce_network(self.G_r,flow_dict_crit,I_crit_r)
     def reduce_network(self,Gr,fr_dict,I_critr):
         #FIXME make graph object, self.G should be changed.
         for i in I_critr:
@@ -636,6 +636,8 @@ class FlowOperations:
     def length_sum_intervals(self,I_list, L_list):
         return sum([L_list[i] for i in I_list])
 
+
+    #partial_flow(flow_dict, I_crit_r, self.I_a, self.instance.jobs, self.instance.J)
     def partial_flow(self,full_flow, node_set, intervals, jobs, J, structure = "focs", parent_J = {}, parent_jobs = []):
         partial_flow = copy.deepcopy(full_flow)
         if structure == "focs":
@@ -749,12 +751,13 @@ class FOCS:
 
             #determine max flow
             self.flow_val, flow_dict = nx.maximum_flow(G_rk, "s", "t", flow_func=self.flow_func)
+            #print(self.flow_val)
             self.maxDiff = sum([G_rk["s"]["j{}".format(j)]["capacity"] for j in self.instance.jobs]) - self.flow_val
             if self.total_demand_r - self.flow_val < err:
                 #end round
 
                 #Check for subcrit. For some instances, there are still active intervals that only now don't reach the max anymore #FIXME (for now)
-                subCrit_mask = [G_rk["i{}".format(i)]["t"]["capacity"]-flow_dict["i{}".format(i)]["t"] > err for i in self.I_a]
+                subCrit_mask = [G_rk["i{}".format(i)]["t"]["capacity"] - flow_dict["i{}".format(i)]["t"] > err for i in self.I_a]
                 subCrit = [self.I_a[i] for i in range(0,len(self.I_a)) if subCrit_mask[i]]
                 
                 #Update I_p
@@ -762,6 +765,7 @@ class FOCS:
                 #Update I_crit
                 self.I_crit = self.I_crit + [sorted([self.I_a[i] for i in range(0,len(self.I_a)) if not subCrit_mask[i]])]
 
+                print("Length of I_p:", len(self.I_p))  # Check length
                 #check terminate
                 if len(self.I_p) == 0:
                     self.terminate = True
@@ -839,6 +843,7 @@ class FOCS:
                 #Update I_crit
                 self.I_crit = self.I_crit + [sorted([self.I_a[i] for i in range(0,len(self.I_a)) if not subCrit_mask[i]])]
 
+                
                 #check terminate
                 if len(self.I_p) == 0:
                     self.terminate = True
@@ -895,6 +900,7 @@ class FOCS:
         #instead of the sum of squares, we first weight the square of the power (e/len_i[i]) by len_i[i]/timeStep      
         #determine power per interval
         p_i = [((self.f["i"+str(i)]['t']/(self.instance.len_i[i]))*self.instance.timeBase) for i in range(0,self.instance.m)]
+        print(self.f)
         #determine weighted squared powers
         powerSquare = [(p_i[i]**2)*(self.instance.len_i[i]/self.instance.timeStep) for i in range(0,self.instance.m)]
         self.objNormalized = sum(powerSquare)
