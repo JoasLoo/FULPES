@@ -185,9 +185,6 @@ class Graph {
 
         timestep = timeStep;
         //init all
-        for (int j = 0; j < I_a_count - 1; j++) {
-            I_a[j] = j;
-        }
 
         average_power_W = sample_vector_C(instance.get_double_array("average_power_W"), instancesize, randomize);
         total_energy = sample_vector_C(instance.get_double_array("total_energy"), instancesize, randomize);
@@ -218,7 +215,7 @@ class Graph {
 
         breakpoints.assign(unique_breakpoints.begin(), unique_breakpoints.end());
 
-        for (size_t i = 0; i < breakpoints.size() - 1; ++i) {
+        for (size_t i = 0; i < breakpoints.size() - 1; i++) {
             intervals_start.push_back(breakpoints[i]);
             intervals_end.push_back(breakpoints[i+1]);
             I_a.push_back(i);
@@ -254,27 +251,12 @@ class Graph {
             std::string to = "t";
             double capacity = 0.0;  // If no value is given, use 0 or determine based on context
             add_flow(from, to, capacity);  // D_t
-        }       
+        }     
+        total_demand_r = calculate_total_demand_r();  
         
         selfterminate = false;
         digraph_r = digraph;
         it = 0;
-    }
-
-    void update_network_capacities_g() {
-        double demand = 0;
-        if (it > 0) {
-            demand = MaxDiff;
-        }
-        else {
-            demand = Get_M(digraph_rk);
-        }
-
-        double demand_normalized = demand / length_sum_intervals(I_a, len_i);
-        for (int i : I_a) {
-            std::string Ikey = "i" + std::to_string(i);
-            GetEdge(Ikey, "t", digraph_rk).capacity = demand_normalized * len_i[i];
-        }
     }
     
     void reduce_network(std::vector<int> crit_r, std::vector<edges>& graph_rK) {
@@ -326,6 +308,25 @@ class Graph {
             }
 
             GetEdge("s", Jkey, digraph_r).flow = sum_flow;
+        }
+    }
+
+    void update_network_capacities_g() {
+        double demand = 0;
+        if (it > 0) {
+            demand = MaxDiff;
+        }
+        else {
+            demand = Get_M(digraph_rk);
+        }
+
+        double demand_normalized = demand / length_sum_intervals(I_a, len_i);
+        std::cout << "demand C++ = " << demand << "\n";
+        std::cout << "length_sum_intervals(I_a, len_i) C++ = " << length_sum_intervals(I_a, len_i) << "\n";
+        std::cout << "demand_normalized C++ = " << demand_normalized << "\n\n\n";
+        for (int i : I_a) {
+            std::string Ikey = "i" + std::to_string(i);
+            GetEdge(Ikey, "t", digraph_rk).capacity = demand_normalized * len_i[i];
         }
     }
 
@@ -388,7 +389,7 @@ class Graph {
                     partial_flow_func(I_crit_r);
                     f = combineflows(partial_flow, digraph_rk);
                 
-                    reduce_network(I_crit_r, digraph_r);
+                    reduce_network(I_crit_r, partial_flow);
 
                     I_a = I_p;                     // Copy the contents of I_p to I_a
                     std::sort(I_a.begin(), I_a.end());  // Sort I_a in ascending order
@@ -438,7 +439,7 @@ class Graph {
 
                 it++;
             } 
-            if (it > 500) {
+            if (it > 5) {
                 selfterminate = true;
                 //print_graph(digraph_r);
             }
@@ -541,7 +542,7 @@ class Graph {
 
     double Get_M(std::vector<edges> X) {
             double M = 0;
-            for (int j : jobs) {
+            for (int j : jobs) {    //jobs is correct.
                 std::string jobKey = "j" + std::to_string(j);
                 if (M == 0) {
                     M = GetEdge("s", jobKey, X).capacity;

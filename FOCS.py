@@ -733,11 +733,10 @@ class FOCS:
             demand_normalized = demand/self.flowOp.length_sum_intervals(self.I_a, self.instance.len_i)         
             for i in self.I_a:
                 G_r["i{}".format(i)]["t"]["capacity"] = demand_normalized * self.instance.len_i[i]
+        print(demand)
+        print(self.flowOp.length_sum_intervals(self.I_a,self.instance.len_i))
+        print(demand_normalized)
 
-        #if global maximum power constraint is active, trigger it here
-        if self.instance.global_cap_active:
-            for i in self.I_a:
-                G_r["i{}".format(i)]["t"]["capacity"] = min(G_r["i{}".format(i)]["t"]["capacity"], self.instance.global_cap[i]*self.instance.len_i[i]*self.instance.tau/self.instance.timeStep)        
         return G_r
     
     def solve_focs(self, err = 0.0000001, MPCstopper = False, MPCcondition = 0):
