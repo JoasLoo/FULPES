@@ -1,10 +1,10 @@
 step,description,seconds
 1,Data loading,0.00000
-2,Instance creation,0.04900
-3,FlowNet instantiation,0.00100
+2,Instance creation,0.01600
+3,FlowNet instantiation,0.00000
 4,Building flow network,0.00000
 5,FlowOperations instantiation,0.00000
 6,FOCS instantiation,0.00000
 7,Setting flow_func,0.00000
 8,FOCS solve,0.00700
-9,Objective calculation,0.00100
+9,Objective calculation,0.00000
