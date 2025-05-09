@@ -123,7 +123,7 @@ int main() {
     clock_t t7 = clock();
     //Set MaxFlowAlgorithm to shortest_augmenting_path
     PyObject *nx = PyImport_ImportModule("networkx.algorithms.flow");
-    PyObject *sap = PyObject_GetAttrString(nx, "shortest_augmenting_path");
+    PyObject *sap = PyObject_GetAttrString(nx, "edmonds_karp");
     if (PyObject_SetAttrString(focs, "flow_func", sap) < 0){
         Fail_EXIT("could not set flow_func");
     }

@@ -49,7 +49,7 @@ from Bookkeeping import Bookkeeping
 
 instanceSize = 10 #number of EVs/jobs in instance
 timeStep = 900 #quarterly granularity
-maxFlowAlg = shortest_augmenting_path #alternatively use e.g., edmonds_karp, preflow_push, or dinitz
+maxFlowAlg = edmonds_karp #alternatively use e.g., edmonds_karp, preflow_push, or dinitz
 randomSample = True
 
 t0 = time.perf_counter()

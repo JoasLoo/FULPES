@@ -96,10 +96,10 @@ class Graph {
 
     Graph(int numnodes) : digraph(numnodes) {}
 
-    void remove_empty(std::vector<edges> digraph){
+    void remove_empty(std::vector<edges>& digraph){
         for (int i =0; i < digraph.size(); ) {
             edges e = digraph.at(i);
-            if (e.from.empty() && e.to.empty()) {
+            if (e.from == "" && e.to == "") {
                 digraph.erase(digraph.begin() + i); //dont increase i, since we already move a slot.
             }
             else {
@@ -150,6 +150,7 @@ class Graph {
                 return WhatGraph[i];
             }
         }
+        std::cout << "from : " << from << " to : " << to << "\n";
         throw std::runtime_error("Edge not found");
     }
 
@@ -252,10 +253,10 @@ class Graph {
             double capacity = 0.0;  // If no value is given, use 0 or determine based on context
             add_flow(from, to, capacity);  // D_t
         }     
-        total_demand_r = calculate_total_demand_r();  
+        digraph_r = digraph;
+        total_demand_r = Get_M(digraph_r);  
         
         selfterminate = false;
-        digraph_r = digraph;
         it = 0;
     }
     
@@ -306,7 +307,6 @@ class Graph {
                     sum_flow += e.flow;
                 }
             }
-
             GetEdge("s", Jkey, digraph_r).flow = sum_flow;
         }
     }
@@ -323,7 +323,14 @@ class Graph {
         double demand_normalized = demand / length_sum_intervals(I_a, len_i);
         std::cout << "demand C++ = " << demand << "\n";
         std::cout << "length_sum_intervals(I_a, len_i) C++ = " << length_sum_intervals(I_a, len_i) << "\n";
+
+        std::cout << "I_a ";
+        for (int i = 0; i < I_a.size(); i++ ) {
+            std::cout << I_a[i] << ", ";
+        }
+        std::cout << "\n";
         std::cout << "demand_normalized C++ = " << demand_normalized << "\n\n\n";
+
         for (int i : I_a) {
             std::string Ikey = "i" + std::to_string(i);
             GetEdge(Ikey, "t", digraph_rk).capacity = demand_normalized * len_i[i];
@@ -348,10 +355,11 @@ class Graph {
                 std::string toKey = "t";
                 for (int i : I_a) {
                     std::string fromKey = "i" + std::to_string(i);
+                    std::cout << "fromKey: " << fromKey << "\n";
                     edges TheEdge = GetEdge(fromKey, toKey, digraph_rk);
-                    std::cout << "Edge from " << TheEdge.from << " to " << TheEdge.to << " - "
+                    /*std::cout << "Edge from " << TheEdge.from << " to " << TheEdge.to << " - "
               << "Capacity: " << TheEdge.capacity << ", Flow: " << TheEdge.flow
-              << ", Err: " << err << std::endl;
+              << ", Err: " << err << std::endl;*/
 
                     bool isCritical = (TheEdge.capacity - TheEdge.flow > err);
                     subCrit_mask.push_back(isCritical);
@@ -367,7 +375,7 @@ class Graph {
 
                 //Update I_p
                 I_p = subCrit;
-                std::cout << "I_p.size() = " << I_p.size() << "\n";
+                std::cout << "I_p.size() = " << I_p.size() << " ////////////////////////////////////////////// \n";
 
                 //Update I_crit
                 std::vector<int> temp;
@@ -407,11 +415,22 @@ class Graph {
                 
                 subCrit_mask.clear();
                 std::string toKey = "t";
+                print_graph(digraph_rk);
                 for (int i : I_a) {
                     std::string fromKey = "i" + std::to_string(i);
-                    edges TheEdge = GetEdge(fromKey, toKey, digraph_r);
+                    edges TheEdge = GetEdge(fromKey, toKey, digraph_rk);
                     bool isCritical = (TheEdge.capacity - TheEdge.flow > err);
                     subCrit_mask.push_back(isCritical);
+                    std::cout << "Edge from " << TheEdge.from << " to " << TheEdge.to << " - "
+              << "Capacity: " << TheEdge.capacity << ", Flow: " << TheEdge.flow
+              << ", Err: " << err << std::endl;
+                    if (isCritical) {
+                        std::cout << "TRUE \n";
+                    }
+                    else {
+                        
+                        std::cout << "FALSE \n";
+                    }
                 }
 
                 subCrit.clear();
@@ -439,16 +458,24 @@ class Graph {
 
                 it++;
             } 
-            if (it > 5) {
+            if (it > 0) {
                 selfterminate = true;
                 //print_graph(digraph_r);
             }
         }
-        objective();
+        if (it <= 0) {
+            objective();
+        }
     }
     
     double calculate_total_demand_r(){ 
         return 0;
+        double temp = 0;
+        for (int i : jobs) {
+            std::string jobKey = "j" + std::to_string(i);
+            temp += GetEdge("s", jobKey, digraph_r).capacity;
+        }
+        return temp;
     }
 
     void Edmonds_Karp() {
@@ -462,24 +489,65 @@ class Graph {
             double path_flow = std::numeric_limits<double>::max();
             for (std::string v = sink; v != source; v = parent[v]) {
                 std::string u = parent[v];
-                for (const edges& e : digraph_rk) {
-                    if (e.from == u && e.to == v && e.capacity - e.flow > err) {
-                        path_flow = std::min(path_flow, e.capacity - e.flow);
-                        break;
+                
+                // Check both forward and reverse edges for available capacity
+                bool forward_found = false;
+                bool reverse_found = false;
+                
+                for (edges& e : digraph_rk) {
+                    if (e.from == u && e.to == v) {
+                        // Forward edge: residual capacity is capacity - flow
+                        if (e.capacity - e.flow > err) {
+                            forward_found = true;
+                            path_flow = std::min(path_flow, e.capacity - e.flow);
+                        }
+                    } else if (e.from == v && e.to == u) {
+                        // Reverse edge: residual capacity is just the flow on the reverse edge
+                        if (e.flow > err) {  // This assumes you are pushing flow through the reverse direction
+                            reverse_found = true;
+                            path_flow = std::min(path_flow, e.flow);
+                        }
                     }
+                }
+            
+                if (!forward_found && !reverse_found) {
+                    std::cerr << "Error: No augmenting path found between " << u << " and " << v << std::endl;
                 }
             }
     
             // Update residual capacities
             for (std::string v = sink; v != source; v = parent[v]) {
                 std::string u = parent[v];
+                // Forward edge
+                bool forward_found = false;
                 for (edges& e : digraph_rk) {
                     if (e.from == u && e.to == v) {
                         e.flow += path_flow;
+                        forward_found = true;
+                        std::cout << "Trying edge from " << e.from << " to " << e.to
+                        << " | cap: " << e.capacity << " | flow: " << e.flow
+                        << " | res cap: " << e.capacity - e.flow << std::endl;
+              
                         break;
                     }
                 }
+                // Reverse edge
+                if (!forward_found) {
+                    for (edges& e : digraph_rk) {
+                        if (e.from == v && e.to == u) {
+                            e.flow -= path_flow;
+                            std::cout << "Trying REVERSEedge from " << e.from << " to " << e.to
+                            << " | cap: " << e.capacity << " | flow: " << e.flow
+                            << " | res cap: " << e.capacity - e.flow << std::endl;
+                  
+                            break;
+                        }
+                    }
+                }
+
             }
+            std::cout << "NEXT \n";
+
             //std::cout << "path_flow " << path_flow << "\n";
             flow_val += path_flow;
         }
@@ -499,13 +567,22 @@ class Graph {
             q.pop();
             
             for (const edges& e : graph) {
+                // Forward edge
                 if (e.from == u && !visited[e.to] && e.capacity - e.flow > err) {
                     q.push(e.to);
                     parent[e.to] = u;
                     visited[e.to] = true;
                     if (e.to == sink) return true;
                 }
+                // Reverse edge
+                else if (e.to == u && !visited[e.from] && e.flow > err) {
+                    q.push(e.from);
+                    parent[e.from] = u;
+                    visited[e.from] = true;
+                }
             }
+            
+            
         }
         return false;
     }

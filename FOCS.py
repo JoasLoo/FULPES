@@ -733,13 +733,15 @@ class FOCS:
             demand_normalized = demand/self.flowOp.length_sum_intervals(self.I_a, self.instance.len_i)         
             for i in self.I_a:
                 G_r["i{}".format(i)]["t"]["capacity"] = demand_normalized * self.instance.len_i[i]
-        print(demand)
-        print(self.flowOp.length_sum_intervals(self.I_a,self.instance.len_i))
-        print(demand_normalized)
+        #print(demand)
+        #print(self.flowOp.length_sum_intervals(self.I_a,self.instance.len_i))
+        print(self.I_a)
+        #print(demand_normalized)
 
         return G_r
     
     def solve_focs(self, err = 0.0000001, MPCstopper = False, MPCcondition = 0):
+        print("STARTING PYTHON")
         while not self.terminate:
             #begin round
             #initiate capacities
@@ -750,6 +752,7 @@ class FOCS:
 
             #determine max flow
             self.flow_val, flow_dict = nx.maximum_flow(G_rk, "s", "t", flow_func=self.flow_func)
+            print(flow_dict)
             #print(self.flow_val)
             self.maxDiff = sum([G_rk["s"]["j{}".format(j)]["capacity"] for j in self.instance.jobs]) - self.flow_val
             if self.total_demand_r - self.flow_val < err:
@@ -761,10 +764,12 @@ class FOCS:
                 
                 #Update I_p
                 self.I_p += subCrit
+
+                print(self.I_p)
+                print("Length of I_p:", len(self.I_p))  # Check length
                 #Update I_crit
                 self.I_crit = self.I_crit + [sorted([self.I_a[i] for i in range(0,len(self.I_a)) if not subCrit_mask[i]])]
-
-                print("Length of I_p:", len(self.I_p))  # Check length
+                
                 #check terminate
                 if len(self.I_p) == 0:
                     self.terminate = True
@@ -803,6 +808,20 @@ class FOCS:
                     subCrit_mask = [(G_rk["i{}".format(i)]["t"]["capacity"] - flow_dict["i{}".format(i)]["t"] > err) or (self.instance.global_cap[i]*self.instance.len_i[i]*self.instance.tau/self.instance.timeStep == G_rk["i{}".format(i)]["t"]["capacity"]) for i in self.I_a]
                 else:
                     subCrit_mask = [G_rk["i{}".format(i)]["t"]["capacity"] - flow_dict["i{}".format(i)]["t"] > err for i in self.I_a]
+
+                    for i in self.I_a:
+                        from_node = f"i{i}"
+                        to_node = "t"
+                        
+                        edge_capacity = G_rk[from_node][to_node]["capacity"]
+                        edge_flow = flow_dict[from_node][to_node]
+                        max_capacity = self.instance.len_i[i] * self.instance.tau / self.instance.timeStep
+                        
+                        print(f"Edge from {from_node} to {to_node} - "
+                            f"Capacity: {edge_capacity}, Flow: {edge_flow}, "
+                            f"Err: {err}, Condition met: "
+                            f"{'yes' if (edge_capacity - edge_flow > err) or (edge_capacity == max_capacity) else 'no'}")
+
                 subCrit = [self.I_a[i] for i in range(0,len(self.I_a)) if subCrit_mask[i]]
 
                 #Reduce network G_rk
@@ -813,6 +832,7 @@ class FOCS:
                 #Update I_p
                 self.I_p += subCrit
 
+                print("subCrit_mask ",subCrit_mask)
                 #Update I_a
                 self.I_a = sorted([self.I_a[i] for i in range(0,len(self.I_a)) if not subCrit_mask[i]])
                 self.it += 1
