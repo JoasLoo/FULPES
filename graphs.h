@@ -287,7 +287,7 @@ class Graph {
     }
     
     void partial_flow_func(std::vector<int> crit_r){ 
-        partial_flow = digraph_rk;
+        partial_flow = digraph_r;
         for (int i : I_a) {
             if (std::find(crit_r.begin(), crit_r.end(), i) == crit_r.end())  {  //is not in crit_r
                 std::string Ikey = "i" + std::to_string(i);
@@ -307,8 +307,14 @@ class Graph {
                     sum_flow += e.flow;
                 }
             }
-            GetEdge("s", Jkey, digraph_rk).flow = sum_flow;
+            GetEdge("s", Jkey, digraph_r).flow = sum_flow;
         }
+    }
+
+    void reset_flows(std::vector<edges>& GRAPH) {
+        for (int i = 0; i < GRAPH.size(); i++) {
+            GRAPH[i].flow = 0;
+        } 
     }
 
     void update_network_capacities_g() {
@@ -331,10 +337,12 @@ class Graph {
         std::cout << "\n";
         std::cout << "demand_normalized C++ = " << demand_normalized << "\n\n\n";
 
+        
         for (int i : I_a) {
             std::string Ikey = "i" + std::to_string(i);
             GetEdge(Ikey, "t", digraph_rk).capacity = demand_normalized * len_i[i];
         }
+        
     }
 
     void solve_focs() {
@@ -342,11 +350,13 @@ class Graph {
             if(it == 0) {
                 digraph_rk = digraph_r;
             }
+            reset_flows(digraph_rk);
             update_network_capacities_g();
             
             Edmonds_Karp();
             MaxDiff = Get_M(digraph_rk) - flow_val; 
-
+            std::cout << "flow_val" << flow_val << "\n";
+            
             if (total_demand_r-flow_val < err) {
                 //end round
 
@@ -409,17 +419,26 @@ class Graph {
                     it = 0;
                 }
             }
-
-
             else {
                 
                 subCrit_mask.clear();
                 std::string toKey = "t";
+                print_graph(digraph_rk);
                 for (int i : I_a) {
                     std::string fromKey = "i" + std::to_string(i);
                     edges TheEdge = GetEdge(fromKey, toKey, digraph_rk);
                     bool isCritical = (TheEdge.capacity - TheEdge.flow > err);
                     subCrit_mask.push_back(isCritical);
+                    std::cout << "Edge from " << TheEdge.from << " to " << TheEdge.to << " - "
+              << "Capacity: " << TheEdge.capacity << ", Flow: " << TheEdge.flow
+              << ", Err: " << err << std::endl;
+                    if (isCritical) {
+                        std::cout << "TRUE \n";
+                    }
+                    else {
+                        
+                        std::cout << "FALSE \n";
+                    }
                 }
 
                 subCrit.clear();
@@ -447,13 +466,24 @@ class Graph {
 
                 it++;
             } 
-            if (it > 10) {
+            if (it > 1) {
                 selfterminate = true;
+                //print_graph(digraph_r);
             }
         }
-        if (it <= 10) {
+        if (it <= 1) {
             objective();
         }
+    }
+    
+    double calculate_total_demand_r(){ 
+        return 0;
+        double temp = 0;
+        for (int i : jobs) {
+            std::string jobKey = "j" + std::to_string(i);
+            temp += GetEdge("s", jobKey, digraph_r).capacity;
+        }
+        return temp;
     }
 
     void Edmonds_Karp() {
@@ -501,7 +531,11 @@ class Graph {
                 for (edges& e : digraph_rk) {
                     if (e.from == u && e.to == v) {
                         e.flow += path_flow;
-                        forward_found = true;        
+                        forward_found = true;
+                        std::cout << "Trying edge from " << e.from << " to " << e.to
+                        << " | cap: " << e.capacity << " | flow: " << e.flow
+                        << " | res cap: " << e.capacity - e.flow << std::endl;
+              
                         break;
                     }
                 }
@@ -510,13 +544,19 @@ class Graph {
                     for (edges& e : digraph_rk) {
                         if (e.from == v && e.to == u) {
                             e.flow -= path_flow;
+                            std::cout << "Trying REVERSEedge from " << e.from << " to " << e.to
+                            << " | cap: " << e.capacity << " | flow: " << e.flow
+                            << " | res cap: " << e.capacity - e.flow << std::endl;
+                  
                             break;
                         }
                     }
                 }
 
             }
+            std::cout << "NEXT \n";
 
+            //std::cout << "path_flow " << path_flow << "\n";
             flow_val += path_flow;
         }
     }
