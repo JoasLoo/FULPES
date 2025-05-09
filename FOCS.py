@@ -734,11 +734,13 @@ class FOCS:
             for i in self.I_a:
                 G_rk["i{}".format(i)]["t"]["capacity"] = demand_normalized * self.instance.len_i[i]
         print("demand ", demand)
-        print("self.flowOp.length_sum_intervals(self.I_a,self.instance.len_i) ", self.flowOp.length_sum_intervals(self.I_a,self.instance.len_i))
+        #print("self.flowOp.length_sum_intervals(self.I_a,self.instance.len_i) ", self.flowOp.length_sum_intervals(self.I_a,self.instance.len_i))
         print(self.I_a)
         print("demand_normalized ", demand_normalized)
 
-        print("len_i ", self.instance.len_i)
+        #print(demand_normalized * self.instance.len_i[1])
+
+        #print("len_i ", self.instance.len_i)
 
         return G_rk
     
@@ -754,9 +756,10 @@ class FOCS:
 
             #determine max flow
             self.flow_val, flow_dict = nx.maximum_flow(G_rk, "s", "t", flow_func=self.flow_func)
-            print(flow_dict)
+            #print(flow_dict)
             #print(self.flow_val)
             self.maxDiff = sum([G_rk["s"]["j{}".format(j)]["capacity"] for j in self.instance.jobs]) - self.flow_val
+            print("self.maxDiff+self.flow_val ", self.maxDiff+self.flow_val)
             print("self.flow_val",  self.flow_val)
             if self.total_demand_r - self.flow_val < err:
                 #end round
@@ -824,7 +827,10 @@ class FOCS:
                             f"Capacity: {edge_capacity}, Flow: {edge_flow}, "
                             f"Err: {err}, Condition met: "
                             f"{'yes' if (edge_capacity - edge_flow > err) or (edge_capacity == max_capacity) else 'no'}")
+                    #print("Edges with data:", G_rk.edges(data=True))
 
+
+                
                 subCrit = [self.I_a[i] for i in range(0,len(self.I_a)) if subCrit_mask[i]]
 
                 #Reduce network G_rk
@@ -834,8 +840,6 @@ class FOCS:
                 
                 #Update I_p
                 self.I_p += subCrit
-
-                print("subCrit_mask ",subCrit_mask)
                 #Update I_a
                 self.I_a = sorted([self.I_a[i] for i in range(0,len(self.I_a)) if not subCrit_mask[i]])
                 self.it += 1
@@ -922,7 +926,6 @@ class FOCS:
         #instead of the sum of squares, we first weight the square of the power (e/len_i[i]) by len_i[i]/timeStep      
         #determine power per interval
         p_i = [((self.f["i"+str(i)]['t']/(self.instance.len_i[i]))*self.instance.timeBase) for i in range(0,self.instance.m)]
-        print(self.f)
         #determine weighted squared powers
         powerSquare = [(p_i[i]**2)*(self.instance.len_i[i]/self.instance.timeStep) for i in range(0,self.instance.m)]
         self.objNormalized = sum(powerSquare)

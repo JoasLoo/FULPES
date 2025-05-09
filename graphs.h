@@ -16,6 +16,8 @@
 #include <random>
 #include <set>
 #include <queue>
+#include <unordered_set>
+#include <functional>
 
 inline std::vector<double> sample_vector_C(const std::vector<double>& input, int N, bool randomSample) {
     std::vector<double> result;
@@ -228,7 +230,6 @@ class Graph {
 
         //focs_instance_to_network
         for (int j : jobs) {
-            //std::cout << j << "\n";
             std::string from = "s";
             std::string to = "j" + std::to_string(j);
             double capacity = jobs_demand[j];
@@ -256,6 +257,7 @@ class Graph {
         digraph_r = digraph;
         total_demand_r = Get_M(digraph_r);  
         
+        fulfilled = 0;
         selfterminate = false;
         it = 0;
     }
@@ -263,10 +265,17 @@ class Graph {
     void reduce_network(std::vector<int> crit_r, std::vector<edges>& graph_rK) {
         for (int i : crit_r) {
             std::string Ikey = "i" + std::to_string(i);
+            double remove_from_s_to_jX = 0;
             for (int j = 0; j < graph_rK.size(); j++) {
                 if (graph_rK[j].from == Ikey || graph_rK[j].to == Ikey) {
+                    if(graph_rK[j].to == Ikey) {
+                        remove_from_s_to_jX = graph_rK[j].flow;
+                        GetEdge("s", graph_rK[j].from, digraph_rk).capacity -= remove_from_s_to_jX;
+                        GetEdge("s", graph_rK[j].from, digraph_rk).flow -= remove_from_s_to_jX;
+                    }
                     graph_rK[j].from = "";
                     graph_rK[j].to = "";
+                    //fulfilled += graph_rK[j].flow/2;
                 }
             }
         }
@@ -278,7 +287,6 @@ class Graph {
             for (int j = 0; j < adder.size(); j++) {
                 if (start[i].from == adder[j].from && start[i].to == adder[j].to) {
                     start[i].flow += adder[j].flow;
-                    //std::cout << start[i].flow << " " << adder[j].flow << "\n";
                     break;
                 }
             }
@@ -319,14 +327,23 @@ class Graph {
 
     void update_network_capacities_g() {
         double demand = 0;
+        double demand_normalized = 0;
         if (it > 0) {
             demand = MaxDiff;
+            demand_normalized = demand / length_sum_intervals(I_a, len_i);
+            for (int i : I_a) {
+                std::string Ikey = "i" + std::to_string(i);
+                GetEdge(Ikey, "t", digraph_rk).capacity += demand_normalized * len_i[i];
+            }
         }
         else {
             demand = Get_M(digraph_rk);
+            demand_normalized = demand / length_sum_intervals(I_a, len_i);
+            for (int i : I_a) {
+                std::string Ikey = "i" + std::to_string(i);
+                GetEdge(Ikey, "t", digraph_rk).capacity = demand_normalized * len_i[i];
+            }
         }
-
-        double demand_normalized = demand / length_sum_intervals(I_a, len_i);
         std::cout << "demand C++ = " << demand << "\n";
         std::cout << "length_sum_intervals(I_a, len_i) C++ = " << length_sum_intervals(I_a, len_i) << "\n";
 
@@ -336,13 +353,6 @@ class Graph {
         }
         std::cout << "\n";
         std::cout << "demand_normalized C++ = " << demand_normalized << "\n\n\n";
-
-        
-        for (int i : I_a) {
-            std::string Ikey = "i" + std::to_string(i);
-            GetEdge(Ikey, "t", digraph_rk).capacity = demand_normalized * len_i[i];
-        }
-        
     }
 
     void solve_focs() {
@@ -350,11 +360,11 @@ class Graph {
             if(it == 0) {
                 digraph_rk = digraph_r;
             }
-            reset_flows(digraph_rk);
             update_network_capacities_g();
-            
-            Edmonds_Karp();
+            //Edmonds_Karp();
+            Max_flow_solver();
             MaxDiff = Get_M(digraph_rk) - flow_val; 
+            std::cout << "Get_M(digraph_rk)" << Get_M(digraph_rk) << "\n";
             std::cout << "flow_val" << flow_val << "\n";
             
             if (total_demand_r-flow_val < err) {
@@ -365,11 +375,7 @@ class Graph {
                 std::string toKey = "t";
                 for (int i : I_a) {
                     std::string fromKey = "i" + std::to_string(i);
-                    std::cout << "fromKey: " << fromKey << "\n";
                     edges TheEdge = GetEdge(fromKey, toKey, digraph_rk);
-                    /*std::cout << "Edge from " << TheEdge.from << " to " << TheEdge.to << " - "
-              << "Capacity: " << TheEdge.capacity << ", Flow: " << TheEdge.flow
-              << ", Err: " << err << std::endl;*/
 
                     bool isCritical = (TheEdge.capacity - TheEdge.flow > err);
                     subCrit_mask.push_back(isCritical);
@@ -384,7 +390,7 @@ class Graph {
                 }
 
                 //Update I_p
-                I_p = subCrit;
+                I_p.insert(I_p.end(), subCrit.begin(), subCrit.end());
                 std::cout << "I_p.size() = " << I_p.size() << " ////////////////////////////////////////////// \n";
 
                 //Update I_crit
@@ -417,13 +423,13 @@ class Graph {
                 
                     rd++;
                     it = 0;
+                    fulfilled = 0;
                 }
             }
             else {
                 
                 subCrit_mask.clear();
                 std::string toKey = "t";
-                print_graph(digraph_rk);
                 for (int i : I_a) {
                     std::string fromKey = "i" + std::to_string(i);
                     edges TheEdge = GetEdge(fromKey, toKey, digraph_rk);
@@ -455,6 +461,9 @@ class Graph {
 
                 I_p.insert(I_p.end(), subCrit.begin(), subCrit.end());
 
+                if (I_a.empty()) {
+                    std::cout << "HERE1 ------------------------------------------------ \n";
+                }
                 std::vector<int> new_I_a;
                 for (size_t i = 0; i < I_a.size(); ++i) {
                     if (!subCrit_mask[i]) {
@@ -463,15 +472,17 @@ class Graph {
                 }
                 std::sort(new_I_a.begin(), new_I_a.end());
                 I_a = new_I_a;
+                if (new_I_a.empty()) {
+                    std::cout << "HERE ------------------------------------------------ \n";
+                }
 
                 it++;
             } 
-            if (it > 1) {
+            if (it > 10) {
                 selfterminate = true;
-                //print_graph(digraph_r);
             }
         }
-        if (it <= 1) {
+        if (it <= 10) {
             objective();
         }
     }
@@ -486,7 +497,25 @@ class Graph {
         return temp;
     }
 
+    void Max_flow_solver() {
+        Edmonds_Karp();
+        // After redistributing, run Edmonds-Karp again to fill freed space
+        for (int i : I_a) {
+            std::string ikey = "i" + std::to_string(i);
+            double cap_to_t = GetEdge(ikey, "t", digraph_rk).capacity;
+            double flow_to_t = GetEdge(ikey, "t", digraph_rk).flow;
+        
+            if (flow_to_t + 0.0001 < cap_to_t) {
+                std::cout << "Detected underutilization at " << ikey << " → t, resetting flow\n";
+                reset_flows(digraph_rk);   // Reset all flows to 0
+                Edmonds_Karp();            // Recompute full max-flow from scratch
+                break;                     // Exit loop; re-evaluate from start after EK
+            }
+        }        
+    }
+
     void Edmonds_Karp() {
+        //print_graph(digraph_rk);
         std::string source = "s";
         std::string sink = "t";
         flow_val = 0;
@@ -552,13 +581,14 @@ class Graph {
                         }
                     }
                 }
-
             }
             std::cout << "NEXT \n";
-
-            //std::cout << "path_flow " << path_flow << "\n";
-            flow_val += path_flow;
         }
+        double temp;
+        for (int i : I_a) {
+            std::string Ikey = "i" + std::to_string(i);
+            flow_val += GetEdge(Ikey, "t", digraph_rk).flow;
+        } 
     }
     
 
@@ -595,6 +625,50 @@ class Graph {
         return false;
     }
 
+    bool redistribute_flow(const std::string& target_node, double needed_capacity) {
+        std::unordered_map<std::string, std::string> parent;
+        std::unordered_set<std::string> visited;
+    
+        std::function<bool(std::string)> dfs = [&](std::string u) {
+            visited.insert(u);
+            if (u == "s") return true;
+    
+            for (edges& e : digraph_rk) {
+                // Traverse reverse edges (i.e., flow > 0)
+                if (e.to == u && e.flow > err && visited.find(e.from) == visited.end()) {
+                    parent[e.from] = u;
+                    if (dfs(e.from)) return true;
+                }
+            }
+            return false;
+        };
+    
+        if (!dfs(target_node)) return false;
+    
+        // Find bottleneck along reverse path
+        double path_flow = needed_capacity;
+        for (std::string v = "s"; v != target_node; v = parent[v]) {
+            std::string u = parent[v];
+            for (edges& e : digraph_rk) {
+                if (e.to == u && e.from == v) {
+                    path_flow = std::min(path_flow, e.flow);
+                }
+            }
+        }
+    
+        // Apply flow reduction along reverse path
+        for (std::string v = "s"; v != target_node; v = parent[v]) {
+            std::string u = parent[v];
+            for (edges& e : digraph_rk) {
+                if (e.to == u && e.from == v) {
+                    e.flow -= path_flow;
+                }
+            }
+        }
+    
+        return true;
+    }    
+
     void objective() {
         print_graph(f);
         int m = intervals_start.size();
@@ -610,7 +684,7 @@ class Graph {
         }
 
         objNormalized = std::accumulate(powerSquare.begin(), powerSquare.end(), 0.0);
-        std::cout << "Objective value C++ = " << objNormalized << "\n";
+        std::cout << "Objective value C++ = " << objNormalized << " ////////////////////////////////////////////////////////////////////////////////////////////////// \n";
         //return objNormalized;
     }
     
@@ -636,6 +710,7 @@ class Graph {
                     M += GetEdge("s", jobKey, X).capacity;
                 }
             }
+            M -= fulfilled;
             return M;
     }
 
@@ -678,6 +753,7 @@ class Graph {
     bool selfterminate;
     double total_demand_r = 0;
     double objNormalized;
+    double fulfilled = 0;
 };
 
 #endif
