@@ -257,7 +257,6 @@ class Graph {
         digraph_r = digraph;
         total_demand_r = Get_M(digraph_r);  
         
-        fulfilled = 0;
         selfterminate = false;
         it = 0;
     }
@@ -275,7 +274,6 @@ class Graph {
                     }
                     graph_rK[j].from = "";
                     graph_rK[j].to = "";
-                    //fulfilled += graph_rK[j].flow/2;
                 }
             }
         }
@@ -329,7 +327,13 @@ class Graph {
         double demand = 0;
         double demand_normalized = 0;
         if (it > 0) {
-            demand = MaxDiff;
+            if (rd == 0) {
+                demand = MaxDiff;
+            }
+            else {
+                demand = MaxDiff-flow_val_saved;
+            }
+            
             demand_normalized = demand / length_sum_intervals(I_a, len_i);
             for (int i : I_a) {
                 std::string Ikey = "i" + std::to_string(i);
@@ -337,7 +341,13 @@ class Graph {
             }
         }
         else {
-            demand = Get_M(digraph_rk);
+            std::cout << "STARTED OVER?\n";
+            if (rd == 0) {
+                demand = Get_M(digraph_rk);
+            }
+            else {
+                demand = Get_M(digraph_rk)-flow_val_saved;
+            }
             demand_normalized = demand / length_sum_intervals(I_a, len_i);
             for (int i : I_a) {
                 std::string Ikey = "i" + std::to_string(i);
@@ -410,20 +420,24 @@ class Graph {
                 }
                 else {
                     I_crit_r = I_crit.back();
-                    partial_flow_func(I_crit_r);
-                    f = combineflows(partial_flow, digraph_rk);
+                    //partial_flow_func(I_crit_r);
+                    f = combineflows(f, partial_flow);
                 
-                    reduce_network(I_crit_r, partial_flow);
+                    reduce_network(I_crit_r, digraph_rk);
+                    //print_graph(partial_flow);
+                    print_graph(digraph_rk);
+                    //digraph_r = partial_flow;
 
                     I_a = I_p;                     // Copy the contents of I_p to I_a
                     std::sort(I_a.begin(), I_a.end());  // Sort I_a in ascending order
                     I_p.clear();
 
                     total_demand_r = Get_M(digraph_r);
+
+                    flow_val_saved += flow_val;
                 
                     rd++;
                     it = 0;
-                    fulfilled = 0;
                 }
             }
             else {
@@ -454,7 +468,7 @@ class Graph {
                     }
                 }
 
-                partial_flow_func(subCrit);
+                //partial_flow_func(subCrit);
                 reduce_network(subCrit, digraph_rk);
 
                 total_demand_r = Get_M(digraph_rk);
@@ -506,7 +520,7 @@ class Graph {
             double flow_to_t = GetEdge(ikey, "t", digraph_rk).flow;
         
             if (flow_to_t + 0.0001 < cap_to_t) {
-                std::cout << "Detected underutilization at " << ikey << " → t, resetting flow\n";
+                //std::cout << "Detected underutilization at " << ikey << " → t, resetting flow\n";
                 reset_flows(digraph_rk);   // Reset all flows to 0
                 Edmonds_Karp();            // Recompute full max-flow from scratch
                 break;                     // Exit loop; re-evaluate from start after EK
@@ -561,10 +575,6 @@ class Graph {
                     if (e.from == u && e.to == v) {
                         e.flow += path_flow;
                         forward_found = true;
-                        std::cout << "Trying edge from " << e.from << " to " << e.to
-                        << " | cap: " << e.capacity << " | flow: " << e.flow
-                        << " | res cap: " << e.capacity - e.flow << std::endl;
-              
                         break;
                     }
                 }
@@ -573,10 +583,6 @@ class Graph {
                     for (edges& e : digraph_rk) {
                         if (e.from == v && e.to == u) {
                             e.flow -= path_flow;
-                            std::cout << "Trying REVERSEedge from " << e.from << " to " << e.to
-                            << " | cap: " << e.capacity << " | flow: " << e.flow
-                            << " | res cap: " << e.capacity - e.flow << std::endl;
-                  
                             break;
                         }
                     }
@@ -710,7 +716,6 @@ class Graph {
                     M += GetEdge("s", jobKey, X).capacity;
                 }
             }
-            M -= fulfilled;
             return M;
     }
 
@@ -745,7 +750,7 @@ class Graph {
     int timestep;
     int rd, it;
     std::vector<edges> digraph_r, digraph_rk, partial_flow, f;
-    double flow_val = 0, MaxDiff = 0;
+    double flow_val = 0, flow_val_saved = 0, MaxDiff = 0;
 
     double err = 0.0000001;
     bool MPCstopper = false;
@@ -753,7 +758,6 @@ class Graph {
     bool selfterminate;
     double total_demand_r = 0;
     double objNormalized;
-    double fulfilled = 0;
 };
 
 #endif
