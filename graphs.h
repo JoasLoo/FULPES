@@ -181,7 +181,7 @@ class Graph {
         }
     }
     
-    void init_focs(InstanceData instance, int timeStep, int instancesize, bool randomize, int I_a_count) {
+    void init_focs(InstanceData instance, int timeStep, int instancesize, bool randomize) {
 
         remove_empty(digraph);
 

@@ -7,7 +7,7 @@
 using namespace std;
 
 
-const int instanceSize = 50; //number of EVs/jobs in instance
+const int instanceSize = 500; //number of EVs/jobs in instance
 int timeStep = 900; //quarterly granularity
 
 //PyObject *maxFlowAlg = shortest_augmenting_path;  // #alternatively use e.g., edmonds_karp, preflow_push, or dinitz
@@ -46,7 +46,7 @@ int main() {
         exit(0);
     }
     //Start Python environment
-    Py_Initialize();
+   /* Py_Initialize();
     
     //Import FOCS.py
     PyObject *pName = PyUnicode_DecodeFSDefault("FOCS");
@@ -85,7 +85,7 @@ int main() {
     g.remove_empty(g.digraph);
     clock_t q2 = clock();
     
-    g.init_focs(instance1, timeStep, instanceSize, randomSample, counter);
+    g.init_focs(instance1, timeStep, instanceSize, randomSample);
     clock_t q3 = clock();
     //g.print_graph();   
     g.solve_focs();
@@ -146,6 +146,9 @@ int main() {
     printf("Objective value = %.9f\n", obj_val);
 
     //FINISHED
+
+
+    
 
     printf("1) Data loading took            %.5f seconds\n", (double)(t1 - t0) / CLOCKS_PER_SEC);
     printf("X) LOADING C DATA            %.5f seconds\n", (double)(q1 - t1) / CLOCKS_PER_SEC);
@@ -218,7 +221,31 @@ int main() {
     Py_XDECREF(script);
     Py_XDECREF(FOCS);
     Py_Finalize();
-    //close the csv
+    //close the csv*/
+
+
+    
+    clock_t t1 = clock();
+    InstanceData instance1 = opendata_toC("Data/DEMSdata_FOCS_v1.csv");
+    clock_t q1 = clock();
+
+    Graph g(1);
+    g.remove_empty(g.digraph);
+    clock_t q2 = clock();
+    
+    g.init_focs(instance1, timeStep, instanceSize, randomSample);
+    clock_t q3 = clock();
+    //g.print_graph();   
+    g.solve_focs();
+    
+    clock_t qx = clock();
+
+
+    printf("X) LOADING C DATA            %.5f seconds\n", (double)(q1 - t1) / CLOCKS_PER_SEC);
+    printf("X) INIT C GRAPH            %.5f seconds\n", (double)(q2 - q1) / CLOCKS_PER_SEC);
+    printf("X) INIT C FOCS            %.5f seconds\n", (double)(q3 - q2) / CLOCKS_PER_SEC);
+    printf("X) SOLVE C FOCS            %.5f seconds\n", (double)(qx - q3) / CLOCKS_PER_SEC);
+
     fclose(data);
     return 0;
 }
