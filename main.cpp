@@ -7,7 +7,7 @@
 using namespace std;
 
 
-const int instanceSize = 5; //number of EVs/jobs in instance
+const int instanceSize = 50; //number of EVs/jobs in instance
 int timeStep = 900; //quarterly granularity
 
 //PyObject *maxFlowAlg = shortest_augmenting_path;  // #alternatively use e.g., edmonds_karp, preflow_push, or dinitz
@@ -78,13 +78,15 @@ int main() {
     //test part///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     InstanceData instance1 = opendata_toC("Data/DEMSdata_FOCS_v1.csv");
-
+    clock_t q1 = clock();
     int counter = extract_unique_sorted_times(dataToSolve);
 
     Graph g(1);
     g.remove_empty(g.digraph);
+    clock_t q2 = clock();
     
     g.init_focs(instance1, timeStep, instanceSize, randomSample, counter);
+    clock_t q3 = clock();
     //g.print_graph();   
     g.solve_focs();
     
@@ -146,7 +148,10 @@ int main() {
     //FINISHED
 
     printf("1) Data loading took            %.5f seconds\n", (double)(t1 - t0) / CLOCKS_PER_SEC);
-    printf("X) ALL C PARTS TOOK            %.5f seconds\n", (double)(qx - t1) / CLOCKS_PER_SEC);
+    printf("X) LOADING C DATA            %.5f seconds\n", (double)(q1 - t1) / CLOCKS_PER_SEC);
+    printf("X) INIT C GRAPH            %.5f seconds\n", (double)(q2 - q1) / CLOCKS_PER_SEC);
+    printf("X) INIT C FOCS            %.5f seconds\n", (double)(q3 - q2) / CLOCKS_PER_SEC);
+    printf("X) SOLVE C FOCS            %.5f seconds\n", (double)(qx - q3) / CLOCKS_PER_SEC);
     printf("2) Instance creation took       %.5f seconds\n", (double)(t2 - qx) / CLOCKS_PER_SEC);
     printf("3) FlowNet instantiation took   %.5f seconds\n", (double)(t3 - t2) / CLOCKS_PER_SEC);
     printf("4) Building flow network took   %.5f seconds\n", (double)(t4 - t3) / CLOCKS_PER_SEC);

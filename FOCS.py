@@ -709,7 +709,6 @@ class FOCS:
         self.terminate = False
         self.G = flowNet.G
         self.G_r = self.G
-        #print(self.G_r)
         self.total_demand_r = self.calculate_total_demand_r() # sum([self.G_r["s"]["j{}".format(j)]["capacity"] for j in self.instance.jobs])
         self.flow_func = shortest_augmenting_path #(or e.g., edmonds_karp)
         self.flow_val = 0
@@ -733,19 +732,9 @@ class FOCS:
             demand_normalized = demand/self.flowOp.length_sum_intervals(self.I_a, self.instance.len_i)         
             for i in self.I_a:
                 G_rk["i{}".format(i)]["t"]["capacity"] = demand_normalized * self.instance.len_i[i]
-        print("demand ", demand)
-        #print("self.flowOp.length_sum_intervals(self.I_a,self.instance.len_i) ", self.flowOp.length_sum_intervals(self.I_a,self.instance.len_i))
-        print(self.I_a)
-        print("demand_normalized ", demand_normalized)
-
-        #print(demand_normalized * self.instance.len_i[1])
-
-        #print("len_i ", self.instance.len_i)
-
         return G_rk
     
     def solve_focs(self, err = 0.0000001, MPCstopper = False, MPCcondition = 0):
-        print("STARTING PYTHON")
         while not self.terminate:
             #begin round
             #initiate capacities
@@ -756,11 +745,8 @@ class FOCS:
 
             #determine max flow
             self.flow_val, flow_dict = nx.maximum_flow(G_rk, "s", "t", flow_func=self.flow_func)
-            #print(flow_dict)
-            #print(self.flow_val)
+
             self.maxDiff = sum([G_rk["s"]["j{}".format(j)]["capacity"] for j in self.instance.jobs]) - self.flow_val
-            print("self.maxDiff+self.flow_val ", self.maxDiff+self.flow_val)
-            print("self.flow_val",  self.flow_val)
             if self.total_demand_r - self.flow_val < err:
                 #end round
 
@@ -771,8 +757,6 @@ class FOCS:
                 #Update I_p
                 self.I_p += subCrit
 
-                print(self.I_p)
-                print("Length of I_p:", len(self.I_p))  # Check length
                 #Update I_crit
                 self.I_crit = self.I_crit + [sorted([self.I_a[i] for i in range(0,len(self.I_a)) if not subCrit_mask[i]])]
                 
@@ -822,12 +806,7 @@ class FOCS:
                         edge_capacity = G_rk[from_node][to_node]["capacity"]
                         edge_flow = flow_dict[from_node][to_node]
                         max_capacity = self.instance.len_i[i] * self.instance.tau / self.instance.timeStep
-                        
-                        print(f"Edge from {from_node} to {to_node} - "
-                            f"Capacity: {edge_capacity}, Flow: {edge_flow}, "
-                            f"Err: {err}, Condition met: "
-                            f"{'yes' if (edge_capacity - edge_flow > err) or (edge_capacity == max_capacity) else 'no'}")
-                    #print("Edges with data:", G_rk.edges(data=True))
+
 
 
                 
