@@ -92,15 +92,6 @@ struct edges {
     edges(std::string f, std::string t, double c, double fl) : from(f), to(t), capacity(c), flow(fl) {}
 };
 
-struct edges_matrix {
-    double capacity;
-    double flow;
-
-    // Constructor
-    edges_matrix() : capacity(0), flow(0) {}
-    edges_matrix(double c, double fl) : capacity(c), flow(fl) {}
-};
-
 class Graph {
     public:
     std::vector<edges> digraph;
@@ -192,6 +183,8 @@ class Graph {
     
     void init_focs(InstanceData instance, int timeStep, int instancesize, bool randomize) {
 
+        remove_empty(digraph);
+
         timestep = timeStep;
         //init all
 
@@ -234,41 +227,12 @@ class Graph {
         find_J();
         find_J_inverse();
 
-        //HERE INSTANTIATION OF MATRIX
-
-        //First add all names to NameMap and ReverseNameMap
-        int countUp = 0;
-        ReverseNameMap[countUp] = "s";
-        NameMap["s"] = countUp++;
-        for (int j : jobs) {
-            std::string to = "j" + std::to_string(j);
-            ReverseNameMap[countUp] = to;
-            NameMap[to] = countUp++;
-        }
-
-        for (int i : I_a) {
-            std::string from = "i" + std::to_string(i);
-            ReverseNameMap[countUp] = from;
-            NameMap[from] = countUp++;
-        }
-
-        ReverseNameMap[countUp] = "t";
-        NameMap["t"] = countUp;
-
-        //dedicate enough space to all matrices.
-        int size = NameMap.size();
-        G = std::vector<std::vector<edges_matrix>>(size, std::vector<edges_matrix>(size));
-        G_rk = G;
-        f_matrix = G;
-        //now we can access each matrix via: G[NameMap["s"]][NameMap["j0"]].capacity = 1;
-
-
         //focs_instance_to_network
         for (int j : jobs) {
             std::string from = "s";
             std::string to = "j" + std::to_string(j);
             double capacity = jobs_demand[j];
-            G[NameMap[from]][NameMap[to]].capacity = capacity;
+            add_flow(from, to, capacity);  // D_s
         }
         
         for (int j : jobs) {
@@ -279,7 +243,7 @@ class Graph {
             for (int i : J_inverse[j_key]) {
                 std::string to = "i" + std::to_string(i);
                 double capacity = cap_j * len_i[i] / timeBase;
-                G[NameMap[from]][NameMap[to]].capacity = capacity;
+                add_flow(from, to, capacity);  // D_0
             }
         }
         
@@ -287,59 +251,95 @@ class Graph {
             std::string from = "i" + std::to_string(i);
             std::string to = "t";
             double capacity = 0.0;  // If no value is given, use 0 or determine based on context
-            G[NameMap[from]][NameMap[to]].capacity = capacity;
+            add_flow(from, to, capacity);  // D_t
         }     
-        G_r = G;
-        total_demand_r = Get_M(G_r);  
+        digraph_r = digraph;
+        total_demand_r = Get_M(digraph_r);  
         
         selfterminate = false;
         it = 0;
     }
-
-    void reduce_network(std::vector<int> crit_r, std::vector<std::vector<edges_matrix>>& graph_rK) {
+    
+    void reduce_network(std::vector<int> crit_r, std::vector<edges>& graph_rK) {
         for (int i : crit_r) {
             std::string Ikey = "i" + std::to_string(i);
             double remove_from_s_to_jX = 0;
-            if(AddingF){
-                f_matrix[NameMap[Ikey]][NameMap["t"]].flow += remove_from_s_to_jX;
-            }
-            graph_rK[NameMap[Ikey]][NameMap["t"]].flow = 0;
-            graph_rK[NameMap[Ikey]][NameMap["t"]].capacity = 0;
-            for (int j : jobs) {
-                std::string Jkey = "i" + std::to_string(i);
-                remove_from_s_to_jX = graph_rK[NameMap[Jkey]][NameMap[Ikey]].flow;
-                if(AddingF){
-                    f_matrix[NameMap["s"]][NameMap[Jkey]].flow += remove_from_s_to_jX;
-                    f_matrix[NameMap[Jkey]][NameMap[Ikey]].flow += remove_from_s_to_jX;
+            for (int j = 0; j < graph_rK.size(); j++) {
+                if (graph_rK[j].from == Ikey || graph_rK[j].to == Ikey) {
+                    if(graph_rK[j].to == Ikey) {
+                        remove_from_s_to_jX = graph_rK[j].flow;
+                        GetEdge("s", graph_rK[j].from, digraph_rk).capacity -= remove_from_s_to_jX;
+                        GetEdge("s", graph_rK[j].from, digraph_rk).flow -= remove_from_s_to_jX;
+                    }
+                    if(AddingF) {  // if F is initiated in another round, add the flows to F.
+                        GetEdge(graph_rK[j].from, graph_rK[j].to, f).flow += graph_rK[j].flow;
+                    }
+                    graph_rK[j].from = "";
+                    graph_rK[j].to = "";
                 }
-                graph_rK[NameMap["s"]][NameMap[Jkey]].flow -= remove_from_s_to_jX;
-                graph_rK[NameMap["s"]][NameMap[Jkey]].capacity -= remove_from_s_to_jX;
             }
+        }
+        remove_empty(graph_rK);
+    }
+
+
+
+    void Add_to_f_end(std::vector<edges>& graph_rK) {
+        for (int i = 0; i < graph_rK.size(); i++) {
+            GetEdge(graph_rK[i].from, graph_rK[i].to, f).flow += graph_rK[i].flow;
         }
     }
 
-    void Add_to_f_end(std::vector<std::vector<edges_matrix>>& graph_rK) {
-        for (int i = 0; i < NameMap.size(); i++) {
-            for(int j = i+1; j < NameMap.size(); j++) {
-                f_matrix[i][j].flow += graph_rK[i][j].flow;
+    std::vector<edges> combineflows(std::vector<edges> start, std::vector<edges> adder) {
+        if(start.empty()) {
+            return adder;
+        }
+        for (int i = 0; i < start.size(); i++) {
+            for (int j = 0; j < adder.size(); j++) {
+                if (start[i].from == adder[j].from && start[i].to == adder[j].to) {
+                    start[i].flow += adder[j].flow;
+                    break;
+                }
             }
+        }
+        return start;
+    }
+    
+    void partial_flow_func(std::vector<int> crit_r){ 
+        partial_flow = digraph_r;
+        for (int i : I_a) {
+            if (std::find(crit_r.begin(), crit_r.end(), i) == crit_r.end())  {  //is not in crit_r
+                std::string Ikey = "i" + std::to_string(i);
+                GetEdge(Ikey, "t", partial_flow).flow = 0;
+                for (int j : J[Ikey]) {
+                    std::string Jkey = "j" + std::to_string(j);
+                    GetEdge(Jkey, Ikey, partial_flow).flow = 0;
+                }
+            }
+        } 
+        for (int j : jobs) {
+            std::string Jkey = "j" + std::to_string(j);
+            double sum_flow = 0.0;
+
+            for (const edges& e : partial_flow) {
+                if (e.from == Jkey) {
+                    sum_flow += e.flow;
+                }
+            }
+            GetEdge("s", Jkey, digraph_r).flow = sum_flow;
         }
     }
 
-    void reset_flows(std::vector<std::vector<edges_matrix>>& GRAPH) {
-        for (int i = 0; i < NameMap.size(); i++) {
-            for(int j = i+1; j < NameMap.size(); j++) { //we dont have reverse edges so no need to reset them.
-                GRAPH[i][j].flow += 0;
-            }
-        }
+    void reset_flows(std::vector<edges>& GRAPH) {
+        for (int i = 0; i < GRAPH.size(); i++) {
+            GRAPH[i].flow = 0;
+        } 
     }
 
-    void reset_caps(std::vector<std::vector<edges_matrix>>& GRAPH) {
-        for (int i = 0; i < NameMap.size(); i++) {
-            for(int j = i+1; j < NameMap.size(); j++) {
-                GRAPH[i][j].capacity = 0;
-            }
-        }
+    void reset_caps(std::vector<edges>& GRAPH) {
+        for (int i = 0; i < GRAPH.size(); i++) {
+            GRAPH[i].capacity = 0;
+        } 
     }
 
     void update_network_capacities_g() {
@@ -356,35 +356,36 @@ class Graph {
             demand_normalized = demand / length_sum_intervals(I_a, len_i);
             for (int i : I_a) {
                 std::string Ikey = "i" + std::to_string(i);
-                G_rk[NameMap[Ikey]][NameMap["t"]].capacity += demand_normalized * len_i[i];
+                GetEdge(Ikey, "t", digraph_rk).capacity += demand_normalized * len_i[i];
             }
         }
         else {
             if (rd == 0) {
-                demand = Get_M(G_rk);
+                demand = Get_M(digraph_rk);
             }
             else {
-                demand = Get_M(G_rk)-flow_val_saved;
+                demand = Get_M(digraph_rk)-flow_val_saved;
             }
             demand_normalized = demand / length_sum_intervals(I_a, len_i);
             for (int i : I_a) {
                 std::string Ikey = "i" + std::to_string(i);
-                G_rk[NameMap[Ikey]][NameMap["t"]].capacity = demand_normalized * len_i[i];
+                GetEdge(Ikey, "t", digraph_rk).capacity = demand_normalized * len_i[i];
             }
         }
     }
 
     void solve_focs() {
-        reset_caps(f_matrix);
-        reset_flows(f_matrix);
+        f = digraph;
+        reset_caps(f);
+        reset_flows(f);
         while (!selfterminate) {
             if(it == 0) {
-                G_rk = G_r;
+                digraph_rk = digraph_r;
             }
             update_network_capacities_g();
             //Edmonds_Karp();
             Max_flow_solver();
-            MaxDiff = Get_M(G_rk) - flow_val; 
+            MaxDiff = Get_M(digraph_rk) - flow_val; 
             
             if (total_demand_r-flow_val < err) {
                 //end round
@@ -394,7 +395,7 @@ class Graph {
                 std::string toKey = "t";
                 for (int i : I_a) {
                     std::string fromKey = "i" + std::to_string(i);
-                    edges_matrix TheEdge = G_rk[NameMap[fromKey]][NameMap[toKey]];
+                    edges TheEdge = GetEdge(fromKey, toKey, digraph_rk);
 
                     bool isCritical = (TheEdge.capacity - TheEdge.flow > err);
                     subCrit_mask.push_back(isCritical);
@@ -423,18 +424,20 @@ class Graph {
                 I_crit.push_back(temp);
                 if (I_p.size() == 0) {
                     selfterminate = true;
-                    Add_to_f_end(G_rk);
+                    AddingF = true; //we need this otherwise F gets added also when subcrit. but we only want when crit.
+                    Add_to_f_end(digraph_rk);
+                    AddingF = false;    //still setting to false so i dont have to do that in init_Focs anymore <3
                 }
                 else {
                     I_crit_r = I_crit.back();
                     AddingF = true;
-                    reduce_network(I_crit_r, G_rk);
+                    reduce_network(I_crit_r, digraph_rk);
                     AddingF = false;
                     I_a = I_p;                     // Copy the contents of I_p to I_a
                     std::sort(I_a.begin(), I_a.end());  // Sort I_a in ascending order
                     I_p.clear();
 
-                    total_demand_r = Get_M(G_r)-flow_val_saved;
+                    total_demand_r = Get_M(digraph_r)-flow_val_saved;
 
                     flow_val_saved += flow_val;
                 
@@ -448,7 +451,7 @@ class Graph {
                 std::string toKey = "t";
                 for (int i : I_a) {
                     std::string fromKey = "i" + std::to_string(i);
-                    edges_matrix TheEdge = G_rk[NameMap[fromKey]][NameMap[toKey]];
+                    edges TheEdge = GetEdge(fromKey, toKey, digraph_rk);
                     bool isCritical = (TheEdge.capacity - TheEdge.flow > err);
                     subCrit_mask.push_back(isCritical);
                 }
@@ -460,9 +463,10 @@ class Graph {
                     }
                 }
 
-                reduce_network(subCrit, G_rk);
+                //partial_flow_func(subCrit);
+                reduce_network(subCrit, digraph_rk);
 
-                total_demand_r = Get_M(G_rk)-flow_val_saved;
+                total_demand_r = Get_M(digraph_rk)-flow_val_saved;
 
                 I_p.insert(I_p.end(), subCrit.begin(), subCrit.end());
 
@@ -490,11 +494,11 @@ class Graph {
         // After redistributing, run Edmonds-Karp again to fill freed space
         for (int i : I_a) {
             std::string ikey = "i" + std::to_string(i);
-            double cap_to_t = G_rk[NameMap[ikey]][NameMap["t"]].capacity;
-            double flow_to_t = G_rk[NameMap[ikey]][NameMap["t"]].flow;
+            double cap_to_t = GetEdge(ikey, "t", digraph_rk).capacity;
+            double flow_to_t = GetEdge(ikey, "t", digraph_rk).flow;
         
             if (flow_to_t + 0.0001 < cap_to_t) {
-                reset_flows(G_rk);   // Reset all flows to 0
+                reset_flows(digraph_rk);   // Reset all flows to 0
                 Edmonds_Karp();            // Recompute full max-flow from scratch
                 break;                     // Exit loop; re-evaluate from start after EK
             }
@@ -570,22 +574,18 @@ class Graph {
     
 
     //Breadth First Search
-    bool bfs(std::unordered_map<std::string, std::string>& parent, const std::string& source, const std::string& sink, const std::vector<std::vector<edges_matrix>>& graph) {
+    bool bfs(std::unordered_map<std::string, std::string>& parent, const std::string& source, const std::string& sink, const std::vector<edges>& graph) {
         std::unordered_map<std::string, bool> visited;
         std::queue<std::string> q;
         q.push(source);
         visited[source] = true;
         parent.clear();
-
-        int N = NameMap.size();
     
         while (!q.empty()) {
             std::string u = q.front();
             q.pop();
-
-            int u_idx = nameMap.at(u);
             
-            for (int v_idx = 0; v_idx < N; ++v_idx) {
+            for (const edges& e : graph) {
                 // Forward edge
                 if (e.from == u && !visited[e.to] && e.capacity - e.flow > err) {
                     q.push(e.to);
@@ -599,10 +599,56 @@ class Graph {
                     parent[e.from] = u;
                     visited[e.from] = true;
                 }
-            } 
+            }
+            
+            
         }
         return false;
     }
+
+    bool redistribute_flow(const std::string& target_node, double needed_capacity) {
+        std::unordered_map<std::string, std::string> parent;
+        std::unordered_set<std::string> visited;
+    
+        std::function<bool(std::string)> dfs = [&](std::string u) {
+            visited.insert(u);
+            if (u == "s") return true;
+    
+            for (edges& e : digraph_rk) {
+                // Traverse reverse edges (i.e., flow > 0)
+                if (e.to == u && e.flow > err && visited.find(e.from) == visited.end()) {
+                    parent[e.from] = u;
+                    if (dfs(e.from)) return true;
+                }
+            }
+            return false;
+        };
+    
+        if (!dfs(target_node)) return false;
+    
+        // Find bottleneck along reverse path
+        double path_flow = needed_capacity;
+        for (std::string v = "s"; v != target_node; v = parent[v]) {
+            std::string u = parent[v];
+            for (edges& e : digraph_rk) {
+                if (e.to == u && e.from == v) {
+                    path_flow = std::min(path_flow, e.flow);
+                }
+            }
+        }
+    
+        // Apply flow reduction along reverse path
+        for (std::string v = "s"; v != target_node; v = parent[v]) {
+            std::string u = parent[v];
+            for (edges& e : digraph_rk) {
+                if (e.to == u && e.from == v) {
+                    e.flow -= path_flow;
+                }
+            }
+        }
+    
+        return true;
+    }    
 
     void objective() {
         int m = intervals_start.size();
@@ -633,15 +679,15 @@ class Graph {
         return sum;  // Return the total
     }
 
-    double Get_M(std::vector<std::vector<edges_matrix>> X) {
+    double Get_M(std::vector<edges> X) {
             double M = 0;
             for (int j : jobs) {    //jobs is correct.
                 std::string jobKey = "j" + std::to_string(j);
                 if (M == 0) {
-                    M = X[NameMap["s"]][NameMap[jobKey]].capacity;
+                    M = GetEdge("s", jobKey, X).capacity;
                 }
                 else {
-                    M += X[NameMap["s"]][NameMap[jobKey]].capacity;
+                    M += GetEdge("s", jobKey, X).capacity;
                 }
             }
             return M;
@@ -674,13 +720,10 @@ class Graph {
     std::vector<double> total_energy;
     std::vector<double> total_energy_Wh;
     std::vector<double> maxPower;
-    std::vector<std::vector<edges_matrix>> G, G_r, G_rk, f_matrix;
-    std::unordered_map<std::string, int> NameMap;
-    std::unordered_map<int, std::string> ReverseNameMap;
 
     int timestep;
     int rd, it;
-    std::vector<edges> digraph_r, digraph_rk, f;
+    std::vector<edges> digraph_r, digraph_rk, partial_flow, f;
     double flow_val = 0, flow_val_saved = 0, MaxDiff = 0;
 
     double err = 0.0000001;
