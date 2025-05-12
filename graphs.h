@@ -507,65 +507,49 @@ class Graph {
         flow_val = 0;
         std::unordered_map<std::string, std::string> parent;
     
-        while (bfs(parent, source, sink, digraph_rk)) {
+        while (bfs(parent, source, sink, G_rk)) {
             // Find bottleneck capacity
             double path_flow = std::numeric_limits<double>::max();
             for (std::string v = sink; v != source; v = parent[v]) {
                 std::string u = parent[v];
+                int u_idx = NameMap[u];
+                int v_idx = NameMap[v];
                 
-                // Check both forward and reverse edges for available capacity
-                bool forward_found = false;
-                bool reverse_found = false;
-                
-                for (edges& e : digraph_rk) {
-                    if (e.from == u && e.to == v) {
-                        // Forward edge: residual capacity is capacity - flow
-                        if (e.capacity - e.flow > err) {
-                            forward_found = true;
-                            path_flow = std::min(path_flow, e.capacity - e.flow);
-                        }
-                    } else if (e.from == v && e.to == u) {
-                        // Reverse edge: residual capacity is just the flow on the reverse edge
-                        if (e.flow > err) {  // This assumes you are pushing flow through the reverse direction
-                            reverse_found = true;
-                            path_flow = std::min(path_flow, e.flow);
-                        }
-                    }
+                 // Forward edge
+                if (G_rk[u_idx][v_idx].capacity - G_rk[u_idx][v_idx].flow > err) {
+                    path_flow = std::min(path_flow, G[u_idx][v_idx].capacity - G[u_idx][v_idx].flow);
                 }
-            
-                if (!forward_found && !reverse_found) {
-                    std::cerr << "Error: No augmenting path found between " << u << " and " << v << std::endl;
+                // Reverse edge
+                else if (G_rk[v_idx][u_idx].flow > err) {
+                    path_flow = std::min(path_flow, G_rk[v_idx][u_idx].flow);
+                } else {
+                    std::cerr << "Error: No valid path from " << u << " to " << v << std::endl;
                 }
             }
     
             // Update residual capacities
             for (std::string v = sink; v != source; v = parent[v]) {
                 std::string u = parent[v];
+                int u_idx = NameMap[u];
+                int v_idx = NameMap[v];
+
                 // Forward edge
-                bool forward_found = false;
-                for (edges& e : digraph_rk) {
-                    if (e.from == u && e.to == v) {
-                        e.flow += path_flow;
-                        forward_found = true;
-                        break;
-                    }
+                if (G[u_idx][v_idx].capacity - G[u_idx][v_idx].flow > err) {
+                    G[u_idx][v_idx].flow += path_flow;
                 }
                 // Reverse edge
-                if (!forward_found) {
-                    for (edges& e : digraph_rk) {
-                        if (e.from == v && e.to == u) {
-                            e.flow -= path_flow;
-                            break;
-                        }
-                    }
+                else {
+                    G[v_idx][u_idx].flow -= path_flow;
                 }
             }
         }
-        double temp;
+        // Compute total flow from I_a nodes to sink
+        int sink_idx = NameMap.at("t");
         for (int i : I_a) {
             std::string Ikey = "i" + std::to_string(i);
-            flow_val += GetEdge(Ikey, "t", digraph_rk).flow;
-        } 
+            int i_idx = NameMap.at(Ikey);
+            flow_val += G[i_idx][sink_idx].flow;
+        }
     }
     
 
@@ -583,22 +567,25 @@ class Graph {
             std::string u = q.front();
             q.pop();
 
-            int u_idx = nameMap.at(u);
+            int u_idx = NameMap[u];
             
             for (int v_idx = 0; v_idx < N; ++v_idx) {
-                // Forward edge
-                if (e.from == u && !visited[e.to] && e.capacity - e.flow > err) {
-                    q.push(e.to);
-                    parent[e.to] = u;
-                    visited[e.to] = true;
-                    if (e.to == sink) return true;
+                std::string v = ReverseNameMap[v_idx];
+                // Forward edge: residual capacity exists
+                if (!visited[v] && graph[u_idx][v_idx].capacity - graph[u_idx][v_idx].flow > err) {
+                    q.push(v);
+                    parent[v] = u;
+                    visited[v] = true;
+                    if (v == sink) return true;
                 }
-                // Reverse edge
-                else if (e.to == u && !visited[e.from] && e.flow > err) {
-                    q.push(e.from);
-                    parent[e.from] = u;
-                    visited[e.from] = true;
+    
+                // Reverse edge: flow can be reduced
+                else if (!visited[v] && graph[v_idx][u_idx].flow > err) {
+                    q.push(v);
+                    parent[v] = u;
+                    visited[v] = true;
                 }
+    
             } 
         }
         return false;
