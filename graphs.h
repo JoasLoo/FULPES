@@ -294,25 +294,28 @@ class Graph {
         it = 0;
     }
 
+    double totalreduce_network = 0;
+
     void reduce_network(std::vector<int> crit_r, std::vector<edges_matrix>& graph_rK) {
         for (int i : crit_r) {
             std::string Ikey = "i" + std::to_string(i);
             double remove_from_s_to_jX = 0;
-            for (int j = 1; j < graph_rK.size(); j++) {
-                std::string from = ReverseNameMap[j].first;
-                std::string to = ReverseNameMap[j].second;
-                if (from == Ikey || to == Ikey) {
-                    if(to == Ikey) {
-                        remove_from_s_to_jX = graph_rK[j].flow;
-                        graph_rK[NameMap["s"][from]].capacity -= remove_from_s_to_jX;
-                        graph_rK[NameMap["s"][from]].flow -= remove_from_s_to_jX;
-                    }
-                    if(AddingF) {  // if F is initiated in another round, add the flows to F.
-                        f_matrix[NameMap[from][to]].flow += graph_rK[NameMap[from][to]].flow;
-                    }
-                    graph_rK[NameMap[from][to]].capacity = 0;
-                    graph_rK[NameMap[from][to]].flow = 0;
+
+            for (int j : reverse_adj[Ikey]) {   //if goes towards iX
+                remove_from_s_to_jX = graph_rK[j].flow;
+                graph_rK[NameMap["s"][ReverseNameMap[j].first]].capacity -= remove_from_s_to_jX;
+                graph_rK[NameMap["s"][ReverseNameMap[j].first]].flow -= remove_from_s_to_jX;;
+                if(AddingF) {  // if F is initiated in another round, add the flows to F.
+                    f_matrix[j].flow += graph_rK[j].flow;
                 }
+            }
+
+            for (const auto& [to, j] : NameMap[Ikey]) { //for goes from iX
+                if(AddingF) {  // if F is initiated in another round, add the flows to F.
+                    f_matrix[j].flow += graph_rK[j].flow;
+                }
+                graph_rK[j].capacity = 0;
+                graph_rK[j].flow = 0;
             }
         }
     }
@@ -526,17 +529,20 @@ class Graph {
             for (std::string v = sink; v != source; v = parent[v]) {
                 bool Reverse = false;
                 int idx = NameMap[parent[v]][v];
-                if (idx == 0) Reverse = true;
+                if (idx == 0) {
+                    Reverse = true;
+                    idx = NameMap[v][parent[v]];
+                }
+                edges_matrix x = G_rk[idx];
 
                 if (!Reverse) {
-                    if (G_rk[idx].capacity - G_rk[idx].flow > err) {
-                        path_flow = std::min(path_flow, G_rk[idx].capacity - G_rk[idx].flow);
+                    if (x.capacity - x.flow > err) {
+                        path_flow = std::min(path_flow, x.capacity - x.flow);
                         found = true;
                     }
                 } else {
-                    idx = NameMap[v][parent[v]];
-                    if (G_rk[idx].flow > err) {
-                        path_flow = std::min(path_flow, G_rk[idx].flow);
+                    if (x.flow > err) {
+                        path_flow = std::min(path_flow, x.flow);
                         found = true;
                     }
                 }

@@ -592,7 +592,7 @@ class Graph {
             std::string Ikey = "i" + std::to_string(i);
             flow_val += GetEdge(Ikey, "t", digraph_rk).flow;
         } 
-        std::cout << "Amount of loops: " << keepingcount << "\n";
+        //std::cout << "Amount of loops: " << keepingcount << "\n";
     }
     
 
