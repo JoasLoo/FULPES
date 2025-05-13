@@ -7,7 +7,7 @@
 using namespace std;
 
 
-const int instanceSize = 5; //number of EVs/jobs in instance
+const int instanceSize = 50; //number of EVs/jobs in instance
 int timeStep = 900; //quarterly granularity
 
 //PyObject *maxFlowAlg = shortest_augmenting_path;  // #alternatively use e.g., edmonds_karp, preflow_push, or dinitz
@@ -229,8 +229,7 @@ int main() {
     InstanceData instance1 = opendata_toC("Data/DEMSdata_FOCS_v1.csv");
     clock_t q1 = clock();
 
-    Graph g(1);
-    g.remove_empty(g.digraph);
+    Graph g;
     clock_t q2 = clock();
     
     g.init_focs(instance1, timeStep, instanceSize, randomSample);

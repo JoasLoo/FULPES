@@ -10,6 +10,7 @@
 #include <time.h>
 #include <iostream>
 #include <unordered_map>
+#include <map>
 #include <variant>
 #include <cctype>
 #include <algorithm>
@@ -18,6 +19,7 @@
 #include <queue>
 #include <unordered_set>
 #include <functional>
+#include <iomanip>  // For std::setw and std::setprecision
 
 inline std::vector<double> sample_vector_C(const std::vector<double>& input, int N, bool randomSample) {
     std::vector<double> result;
@@ -103,40 +105,22 @@ struct edges_matrix {
 
 class Graph {
     public:
-    std::vector<edges> digraph;
 
-    Graph(int numnodes) : digraph(numnodes) {}
+    void print_graph(const std::vector<edges_matrix>& digraph) {
+    for (size_t i = 0; i < digraph.size(); ++i) {
+        const edges_matrix& edge = digraph[i];
 
-    void remove_empty(std::vector<edges>& digraph){
-        for (int i =0; i < digraph.size(); ) {
-            edges e = digraph.at(i);
-            if (e.from == "" && e.to == "") {
-                digraph.erase(digraph.begin() + i); //dont increase i, since we already move a slot.
-            }
-            else {
-                i++;
-            }
+        auto it = ReverseNameMap.find(i);
+        if (it != ReverseNameMap.end()) {
+            const std::string& from = it->second.first;
+            const std::string& to = it->second.second;
+            std::cout << "From: " << from << " To: " << to
+                      << " | Capacity: " << edge.capacity
+                      << " | Flow: " << edge.flow << "\n";
         }
     }
+}
 
-    //accept both an edge and simply the variables to make an edge.
-
-    void add_flow(const edges& edge) {
-        digraph.push_back(edge);
-    }
-
-    void add_flow(const std::string& from, const std::string& to, double capacity) {
-        edges edge(from, to, capacity, 0);  // default flow is 0
-        digraph.push_back(edge);
-    }
-    
-    void print_graph(std::vector<edges> digraph) {
-        for(int i =0; i < digraph.size(); i++) {
-            edges e = digraph.at(i);
-            std::cout << "From " << e.from << " to " << e.to
-                          << " | cap: " << e.capacity << " | flow: " << e.flow << "\n";
-        }
-    }
 
     void find_J() {
         for (int i : I_a) {
@@ -153,15 +137,6 @@ class Graph {
         
             J[i_key] = related_jobs;
         }        
-    }
-
-    edges& GetEdge(std::string from, std::string to, std::vector<edges>& WhatGraph) {
-        for (int i = 0; i < WhatGraph.size(); i++) {
-            if(WhatGraph[i].from == from && WhatGraph[i].to == to) {
-                return WhatGraph[i];
-            }
-        }
-        throw std::runtime_error("Edge not found");
     }
 
     void find_J_inverse() {
@@ -237,30 +212,46 @@ class Graph {
         //HERE INSTANTIATION OF MATRIX
 
         //First add all names to NameMap and ReverseNameMap
-        int countUp = 0;
-        ReverseNameMap[countUp] = "s";
-        NameMap["s"] = countUp++;
+        int edgeIndex = 1;      //Starting at 1 so if it defaults to 0 we know it couldnt find the edge.
+
+        // Add all edge names to NameMap and ReverseNameMap
         for (int j : jobs) {
+            std::string from = "s";
             std::string to = "j" + std::to_string(j);
-            ReverseNameMap[countUp] = to;
-            NameMap[to] = countUp++;
+            NameMap[from][to] = edgeIndex;
+            ReverseNameMap[edgeIndex].first = from;
+            ReverseNameMap[edgeIndex].second = to;
+            edgeIndex++;
+        }
+
+        for (int j : jobs) {
+            std::string from = "j" + std::to_string(j);
+            std::string j_key = from;
+            double cap_j = jobs_cap[j];
+            
+            for (int i : J_inverse[j_key]) {
+                std::string to = "i" + std::to_string(i);
+                NameMap[from][to] = edgeIndex;
+                ReverseNameMap[edgeIndex].first = from;
+            ReverseNameMap[edgeIndex].second = to;
+                edgeIndex++;
+            }
         }
 
         for (int i : I_a) {
             std::string from = "i" + std::to_string(i);
-            ReverseNameMap[countUp] = from;
-            NameMap[from] = countUp++;
+            std::string to = "t";
+            NameMap[from][to] = edgeIndex;
+            ReverseNameMap[edgeIndex].first = from;
+            ReverseNameMap[edgeIndex].second = to;
+            edgeIndex++;
         }
 
-        ReverseNameMap[countUp] = "t";
-        NameMap["t"] = countUp;
-
         //dedicate enough space to all matrices.
-        int size = NameMap.size();
-        G = std::vector<std::vector<edges_matrix>>(size, std::vector<edges_matrix>(size));
+        G = std::vector<edges_matrix>(edgeIndex);
         G_rk = G;
         f_matrix = G;
-        //now we can access each matrix via: G[NameMap["s"]][NameMap["j0"]].capacity = 1;
+        //now we can access each matrix via: G[NameMap["s"]["j0"]].capacity = 1;
 
 
         //focs_instance_to_network
@@ -268,7 +259,7 @@ class Graph {
             std::string from = "s";
             std::string to = "j" + std::to_string(j);
             double capacity = jobs_demand[j];
-            G[NameMap[from]][NameMap[to]].capacity = capacity;
+            G[NameMap[from][to]].capacity = capacity;
         }
         
         for (int j : jobs) {
@@ -279,7 +270,7 @@ class Graph {
             for (int i : J_inverse[j_key]) {
                 std::string to = "i" + std::to_string(i);
                 double capacity = cap_j * len_i[i] / timeBase;
-                G[NameMap[from]][NameMap[to]].capacity = capacity;
+                G[NameMap[from][to]].capacity = capacity;
             }
         }
         
@@ -287,58 +278,60 @@ class Graph {
             std::string from = "i" + std::to_string(i);
             std::string to = "t";
             double capacity = 0.0;  // If no value is given, use 0 or determine based on context
-            G[NameMap[from]][NameMap[to]].capacity = capacity;
+            G[NameMap[from][to]].capacity = capacity;
         }     
+
+        for (const auto& [from, innerMap] : NameMap) {
+            for (const auto& [to, edgeIdx] : innerMap) {
+                reverse_adj[to].push_back(edgeIdx);  // Edge ends at `to`, so it’s a reverse edge for `to`
+            }
+        }
+
+
         G_r = G;
         total_demand_r = Get_M(G_r);  
-        
         selfterminate = false;
         it = 0;
     }
 
-    void reduce_network(std::vector<int> crit_r, std::vector<std::vector<edges_matrix>>& graph_rK) {
+    void reduce_network(std::vector<int> crit_r, std::vector<edges_matrix>& graph_rK) {
         for (int i : crit_r) {
             std::string Ikey = "i" + std::to_string(i);
             double remove_from_s_to_jX = 0;
-            if(AddingF){
-                f_matrix[NameMap[Ikey]][NameMap["t"]].flow += remove_from_s_to_jX;
-            }
-            graph_rK[NameMap[Ikey]][NameMap["t"]].flow = 0;
-            graph_rK[NameMap[Ikey]][NameMap["t"]].capacity = 0;
-            for (int j : jobs) {
-                std::string Jkey = "i" + std::to_string(i);
-                remove_from_s_to_jX = graph_rK[NameMap[Jkey]][NameMap[Ikey]].flow;
-                if(AddingF){
-                    f_matrix[NameMap["s"]][NameMap[Jkey]].flow += remove_from_s_to_jX;
-                    f_matrix[NameMap[Jkey]][NameMap[Ikey]].flow += remove_from_s_to_jX;
+            for (int j = 1; j < graph_rK.size(); j++) {
+                std::string from = ReverseNameMap[j].first;
+                std::string to = ReverseNameMap[j].second;
+                if (from == Ikey || to == Ikey) {
+                    if(to == Ikey) {
+                        remove_from_s_to_jX = graph_rK[j].flow;
+                        graph_rK[NameMap["s"][from]].capacity -= remove_from_s_to_jX;
+                        graph_rK[NameMap["s"][from]].flow -= remove_from_s_to_jX;
+                    }
+                    if(AddingF) {  // if F is initiated in another round, add the flows to F.
+                        f_matrix[NameMap[from][to]].flow += graph_rK[NameMap[from][to]].flow;
+                    }
+                    graph_rK[NameMap[from][to]].capacity = 0;
+                    graph_rK[NameMap[from][to]].flow = 0;
                 }
-                graph_rK[NameMap["s"]][NameMap[Jkey]].flow -= remove_from_s_to_jX;
-                graph_rK[NameMap["s"]][NameMap[Jkey]].capacity -= remove_from_s_to_jX;
             }
         }
     }
 
-    void Add_to_f_end(std::vector<std::vector<edges_matrix>>& graph_rK) {
-        for (int i = 0; i < NameMap.size(); i++) {
-            for(int j = i+1; j < NameMap.size(); j++) {
-                f_matrix[i][j].flow += graph_rK[i][j].flow;
-            }
+    void Add_to_f_end(std::vector<edges_matrix>& graph_rK) {
+        for (int i = 0; i < graph_rK.size(); i++) {
+            f_matrix[i].flow += graph_rK[i].flow;
         }
     }
 
-    void reset_flows(std::vector<std::vector<edges_matrix>>& GRAPH) {
-        for (int i = 0; i < NameMap.size(); i++) {
-            for(int j = i+1; j < NameMap.size(); j++) { //we dont have reverse edges so no need to reset them.
-                GRAPH[i][j].flow += 0;
-            }
+    void reset_flows(std::vector<edges_matrix>& GRAPH) {
+        for (int i = 0; i < GRAPH.size(); i++) {
+            GRAPH[i].flow = 0;
         }
     }
 
-    void reset_caps(std::vector<std::vector<edges_matrix>>& GRAPH) {
-        for (int i = 0; i < NameMap.size(); i++) {
-            for(int j = i+1; j < NameMap.size(); j++) {
-                GRAPH[i][j].capacity = 0;
-            }
+    void reset_caps(std::vector<edges_matrix>& GRAPH) {
+        for (int i = 0; i < GRAPH.size(); i++) {
+            GRAPH[i].capacity = 0;
         }
     }
 
@@ -356,7 +349,7 @@ class Graph {
             demand_normalized = demand / length_sum_intervals(I_a, len_i);
             for (int i : I_a) {
                 std::string Ikey = "i" + std::to_string(i);
-                G_rk[NameMap[Ikey]][NameMap["t"]].capacity += demand_normalized * len_i[i];
+                G_rk[NameMap[Ikey]["t"]].capacity += demand_normalized * len_i[i];
             }
         }
         else {
@@ -369,8 +362,10 @@ class Graph {
             demand_normalized = demand / length_sum_intervals(I_a, len_i);
             for (int i : I_a) {
                 std::string Ikey = "i" + std::to_string(i);
-                G_rk[NameMap[Ikey]][NameMap["t"]].capacity = demand_normalized * len_i[i];
+                G_rk[NameMap[Ikey]["t"]].capacity = demand_normalized * len_i[i];
             }
+
+            //std::cout << "Demand: " << demand << " length_sum_intervals(I_a, len_i) " << length_sum_intervals(I_a, len_i) << "\n";
         }
     }
 
@@ -394,7 +389,7 @@ class Graph {
                 std::string toKey = "t";
                 for (int i : I_a) {
                     std::string fromKey = "i" + std::to_string(i);
-                    edges_matrix TheEdge = G_rk[NameMap[fromKey]][NameMap[toKey]];
+                    edges_matrix TheEdge = G_rk[NameMap[fromKey][toKey]];
 
                     bool isCritical = (TheEdge.capacity - TheEdge.flow > err);
                     subCrit_mask.push_back(isCritical);
@@ -448,7 +443,7 @@ class Graph {
                 std::string toKey = "t";
                 for (int i : I_a) {
                     std::string fromKey = "i" + std::to_string(i);
-                    edges_matrix TheEdge = G_rk[NameMap[fromKey]][NameMap[toKey]];
+                    edges_matrix TheEdge = G_rk[NameMap[fromKey][toKey]];
                     bool isCritical = (TheEdge.capacity - TheEdge.flow > err);
                     subCrit_mask.push_back(isCritical);
                 }
@@ -482,79 +477,108 @@ class Graph {
         }
         if (it <= 10) {
             objective();
+            printf("X) TOTAL EDMONDS KARP               %.5f seconds\n", EDMONDSKARPTIME / CLOCKS_PER_SEC); 
         }
     }
     
     void Max_flow_solver() {
+        clock_t z1 = clock();
+        reset_flows(G_rk);   // Reset all flows to 0 for a DFS effect
         Edmonds_Karp();
-        // After redistributing, run Edmonds-Karp again to fill freed space
-        for (int i : I_a) {
-            std::string ikey = "i" + std::to_string(i);
-            double cap_to_t = G_rk[NameMap[ikey]][NameMap["t"]].capacity;
-            double flow_to_t = G_rk[NameMap[ikey]][NameMap["t"]].flow;
-        
-            if (flow_to_t + 0.0001 < cap_to_t) {
-                reset_flows(G_rk);   // Reset all flows to 0
-                Edmonds_Karp();            // Recompute full max-flow from scratch
-                break;                     // Exit loop; re-evaluate from start after EK
-            }
-        }        
+        clock_t z2 = clock();
+        EDMONDSKARPTIME += (double)(z2-z1);
+
+        //printf("X) EDMONDS KARP               %.5f seconds\n", (double)(z2 - z1) / CLOCKS_PER_SEC);
     }
+
+    void print_time_summary(clock_t bfs_start, clock_t bfs_end,
+                            clock_t bottleneck_end) {
+        double bfs_time = 1000.0 * (bfs_end - bfs_start) / CLOCKS_PER_SEC;
+        double bottleneck_time = 1000.0 * (bottleneck_end - bfs_end) / CLOCKS_PER_SEC;
+
+        std::cout << std::fixed << std::setprecision(3);
+        std::cout << "  BFS           : " << bfs_time << " ms";
+        std::cout << "  Bottleneck    : " << bottleneck_time << " ms \n";
+    }
+
 
     void Edmonds_Karp() {
         std::string source = "s";
         std::string sink = "t";
         flow_val = 0;
         std::unordered_map<std::string, std::string> parent;
-    
-        while (bfs(parent, source, sink, G_rk)) {
-            // Find bottleneck capacity
+
+        int keepingcount = 0;
+
+        bool bfstool = true;
+        double TOTALBFS = 0;
+
+        while (bfstool) {
+            keepingcount++;
+            bool found = false;
             double path_flow = std::numeric_limits<double>::max();
+            clock_t z1 = clock();
+            bfstool = bfs(parent, source, sink, G_rk);
+            clock_t z2 = clock();
+            if (!bfstool) break;
+
+            // Find bottleneck
             for (std::string v = sink; v != source; v = parent[v]) {
-                std::string u = parent[v];
-                int u_idx = NameMap[u];
-                int v_idx = NameMap[v];
-                
-                 // Forward edge
-                if (G_rk[u_idx][v_idx].capacity - G_rk[u_idx][v_idx].flow > err) {
-                    path_flow = std::min(path_flow, G[u_idx][v_idx].capacity - G[u_idx][v_idx].flow);
-                }
-                // Reverse edge
-                else if (G_rk[v_idx][u_idx].flow > err) {
-                    path_flow = std::min(path_flow, G_rk[v_idx][u_idx].flow);
+                bool Reverse = false;
+                int idx = NameMap[parent[v]][v];
+                if (idx == 0) Reverse = true;
+
+                if (!Reverse) {
+                    if (G_rk[idx].capacity - G_rk[idx].flow > err) {
+                        path_flow = std::min(path_flow, G_rk[idx].capacity - G_rk[idx].flow);
+                        found = true;
+                    }
                 } else {
-                    std::cerr << "Error: No valid path from " << u << " to " << v << std::endl;
+                    idx = NameMap[v][parent[v]];
+                    if (G_rk[idx].flow > err) {
+                        path_flow = std::min(path_flow, G_rk[idx].flow);
+                        found = true;
+                    }
+                }
+
+                if (!found) {
+                    std::cerr << "Error: No valid path from " << parent[v] << " to " << v << std::endl;
                 }
             }
-    
+
             // Update residual capacities
             for (std::string v = sink; v != source; v = parent[v]) {
-                std::string u = parent[v];
-                int u_idx = NameMap[u];
-                int v_idx = NameMap[v];
+                bool Reverse = false;
+                int idx = NameMap[parent[v]][v];
+                if (idx == 0) Reverse = true;
 
-                // Forward edge
-                if (G[u_idx][v_idx].capacity - G[u_idx][v_idx].flow > err) {
-                    G[u_idx][v_idx].flow += path_flow;
-                }
-                // Reverse edge
-                else {
-                    G[v_idx][u_idx].flow -= path_flow;
+                if (!Reverse) {
+                    if (G_rk[idx].capacity - G_rk[idx].flow > err) {
+                        G_rk[idx].flow += path_flow;
+                    }
+                } else {
+                    idx = NameMap[v][parent[v]];
+                    G_rk[idx].flow -= path_flow;
                 }
             }
+            TOTALBFS += (double)(z2-z1);
+            clock_t z3 = clock();
+            //print_time_summary(z1, z2, z3);
         }
         // Compute total flow from I_a nodes to sink
-        int sink_idx = NameMap.at("t");
         for (int i : I_a) {
             std::string Ikey = "i" + std::to_string(i);
-            int i_idx = NameMap.at(Ikey);
-            flow_val += G[i_idx][sink_idx].flow;
+            flow_val += G_rk[NameMap[Ikey]["t"]].flow;
         }
+
+        //std::cout << "TOTALBFS: " << TOTALBFS << "\n";
+        
+        //std::cout << "Amount of loops: " << keepingcount << "\n"; 
     }
     
 
     //Breadth First Search
-    bool bfs(std::unordered_map<std::string, std::string>& parent, const std::string& source, const std::string& sink, const std::vector<std::vector<edges_matrix>>& graph) {
+    bool bfs(std::unordered_map<std::string, std::string>& parent, const std::string& source, const std::string& sink, const std::vector<edges_matrix>& graph) {
         std::unordered_map<std::string, bool> visited;
         std::queue<std::string> q;
         q.push(source);
@@ -566,27 +590,37 @@ class Graph {
         while (!q.empty()) {
             std::string u = q.front();
             q.pop();
+            bool continue_outer = false;
 
-            int u_idx = NameMap[u];
+            for (const auto& [to, edgeIdx] : NameMap[u]) {
+                //std::cout << "to: "  << to << " edgeIdx " << edgeIdx << "\n";
+                // `to` is the destination node name (e.g., "j0")
+                // `edgeIdx` is the unique index for edge ("s" -> to)
+
+                if (!visited[to] && graph[edgeIdx].capacity - graph[edgeIdx].flow > err) {
+                    q.push(to);
+                    parent[to] = u;
+                    visited[to] = true;
+                    if (to == sink) return true;
+                    continue_outer = true;
+                    //break;  // Skip rest and go to next while loop iteration
+                }
+            }
+
+            if (continue_outer) {
+                continue;
+            }
             
-            for (int v_idx = 0; v_idx < N; ++v_idx) {
-                std::string v = ReverseNameMap[v_idx];
-                // Forward edge: residual capacity exists
-                if (!visited[v] && graph[u_idx][v_idx].capacity - graph[u_idx][v_idx].flow > err) {
-                    q.push(v);
-                    parent[v] = u;
-                    visited[v] = true;
-                    if (v == sink) return true;
+            for (int idx : reverse_adj[u]) {
+                const std::string& from = ReverseNameMap[idx].first;
+                const std::string& to = ReverseNameMap[idx].second;
+                if (to == u && !visited[from] && graph[idx].flow > err) {
+                    q.push(from);
+                    parent[from] = to;
+                    visited[from] = true;
+                    //break;  // Skip rest and go to next while loop iteration
                 }
-    
-                // Reverse edge: flow can be reduced
-                else if (!visited[v] && graph[v_idx][u_idx].flow > err) {
-                    q.push(v);
-                    parent[v] = u;
-                    visited[v] = true;
-                }
-    
-            } 
+            }
         }
         return false;
     }
@@ -596,7 +630,7 @@ class Graph {
         std::vector<double> p_i(m);
         for (int i = 0; i < m; i++) {
             std::string Ikey = "i" + std::to_string(i);
-            double flow = GetEdge(Ikey, "t", f).flow;
+            double flow = f_matrix[NameMap[Ikey]["t"]].flow;
             p_i[i] = (flow / len_i[i]) * timeBase;
         }
         std::vector<double> powerSquare(m);
@@ -620,15 +654,15 @@ class Graph {
         return sum;  // Return the total
     }
 
-    double Get_M(std::vector<std::vector<edges_matrix>> X) {
+    double Get_M(std::vector<edges_matrix> X) {
             double M = 0;
             for (int j : jobs) {    //jobs is correct.
                 std::string jobKey = "j" + std::to_string(j);
                 if (M == 0) {
-                    M = X[NameMap["s"]][NameMap[jobKey]].capacity;
+                    M = X[NameMap["s"][jobKey]].capacity;
                 }
                 else {
-                    M += X[NameMap["s"]][NameMap[jobKey]].capacity;
+                    M += X[NameMap["s"][jobKey]].capacity;
                 }
             }
             return M;
@@ -661,13 +695,14 @@ class Graph {
     std::vector<double> total_energy;
     std::vector<double> total_energy_Wh;
     std::vector<double> maxPower;
-    std::vector<std::vector<edges_matrix>> G, G_r, G_rk, f_matrix;
-    std::unordered_map<std::string, int> NameMap;
-    std::unordered_map<int, std::string> ReverseNameMap;
+    std::vector<edges_matrix> G, G_r, G_rk, f_matrix;
+    std::unordered_map<std::string, std::map<std::string, int>> NameMap;
+    std::unordered_map<int, std::pair<std::string, std::string>> ReverseNameMap;
+    std::unordered_map<std::string, std::vector<int>> reverse_adj;
 
+    double EDMONDSKARPTIME = 0;
     int timestep;
     int rd, it;
-    std::vector<edges> digraph_r, digraph_rk, f;
     double flow_val = 0, flow_val_saved = 0, MaxDiff = 0;
 
     double err = 0.0000001;

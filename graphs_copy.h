@@ -124,8 +124,8 @@ class Graph {
     void print_graph(std::vector<edges> digraph) {
         for(int i =0; i < digraph.size(); i++) {
             edges e = digraph.at(i);
-            std::cout << "From " << e.from << " to " << e.to
-                          << " | cap: " << e.capacity << " | flow: " << e.flow << "\n";
+            std::cout << "From: " << e.from << " To: " << e.to
+                          << " | Capacity: " << e.capacity << " | Flow: " << e.flow << "\n";
         }
     }
 
@@ -371,20 +371,25 @@ class Graph {
                 std::string Ikey = "i" + std::to_string(i);
                 GetEdge(Ikey, "t", digraph_rk).capacity = demand_normalized * len_i[i];
             }
+            //std::cout << "Demand: " << demand << " length_sum_intervals(I_a, len_i) " << length_sum_intervals(I_a, len_i) << "\n";
         }
     }
 
     void solve_focs() {
+        clock_t t1 = clock();
         f = digraph;
         reset_caps(f);
         reset_flows(f);
         while (!selfterminate) {
+            clock_t q1 = clock();
             if(it == 0) {
                 digraph_rk = digraph_r;
             }
             update_network_capacities_g();
+            clock_t q2 = clock();
             //Edmonds_Karp();
             Max_flow_solver();
+            clock_t q3 = clock();
             MaxDiff = Get_M(digraph_rk) - flow_val; 
             
             if (total_demand_r-flow_val < err) {
@@ -483,6 +488,13 @@ class Graph {
             if (it > 10) {
                 selfterminate = true;
             }
+            clock_t q4 = clock();
+
+                //printf("X) LOADING C DATA            %.5f seconds\n", (double)(q1 - t1) / CLOCKS_PER_SEC);
+                //printf("X) UPDATECAPACITIES           %.5f seconds\n", (double)(q2 - q1) / CLOCKS_PER_SEC);
+                //printf("X) MAXFLOW            %.5f seconds\n", (double)(q3 - q2) / CLOCKS_PER_SEC);
+                //printf("X) REST            %.5f seconds\n", (double)(q4 - q3) / CLOCKS_PER_SEC);
+                //printf("---------------------------------------------------------------\n");
         }
         if (it <= 10) {
             objective();
@@ -490,9 +502,12 @@ class Graph {
     }
     
     void Max_flow_solver() {
+        clock_t z1 = clock();
+        reset_flows(digraph_rk);   // Reset all flows to 0
         Edmonds_Karp();
+        clock_t z2 = clock();
         // After redistributing, run Edmonds-Karp again to fill freed space
-        for (int i : I_a) {
+        /*for (int i : I_a) {
             std::string ikey = "i" + std::to_string(i);
             double cap_to_t = GetEdge(ikey, "t", digraph_rk).capacity;
             double flow_to_t = GetEdge(ikey, "t", digraph_rk).flow;
@@ -502,33 +517,40 @@ class Graph {
                 Edmonds_Karp();            // Recompute full max-flow from scratch
                 break;                     // Exit loop; re-evaluate from start after EK
             }
-        }        
+        }      
+        clock_t z3 = clock();  */
+
+        //printf("X) EDMONDS KARP               %.5f seconds\n", (double)(z2 - z1) / CLOCKS_PER_SEC);
+        //printf("X) REST                         %.5f seconds\n", (double)(z3 - z2) / CLOCKS_PER_SEC);
     }
 
     void Edmonds_Karp() {
         std::string source = "s";
         std::string sink = "t";
         flow_val = 0;
+        int keepingcount = 0;
         std::unordered_map<std::string, std::string> parent;
     
         while (bfs(parent, source, sink, digraph_rk)) {
+            keepingcount++;
             // Find bottleneck capacity
+            
             double path_flow = std::numeric_limits<double>::max();
-            for (std::string v = sink; v != source; v = parent[v]) {
-                std::string u = parent[v];
+            for (std::string goal = sink; goal != source; goal = parent[goal]) {
+                std::string src = parent[goal];
                 
                 // Check both forward and reverse edges for available capacity
                 bool forward_found = false;
                 bool reverse_found = false;
                 
                 for (edges& e : digraph_rk) {
-                    if (e.from == u && e.to == v) {
+                    if (e.from == src && e.to == goal) {
                         // Forward edge: residual capacity is capacity - flow
                         if (e.capacity - e.flow > err) {
                             forward_found = true;
                             path_flow = std::min(path_flow, e.capacity - e.flow);
                         }
-                    } else if (e.from == v && e.to == u) {
+                    } else if (e.from == goal && e.to == src) {
                         // Reverse edge: residual capacity is just the flow on the reverse edge
                         if (e.flow > err) {  // This assumes you are pushing flow through the reverse direction
                             reverse_found = true;
@@ -538,8 +560,9 @@ class Graph {
                 }
             
                 if (!forward_found && !reverse_found) {
-                    std::cerr << "Error: No augmenting path found between " << u << " and " << v << std::endl;
+                    std::cerr << "Error: No augmenting path found between " << parent[goal] << " and " << goal << std::endl;
                 }
+                //std::cout << "Pathflow from " << parent[goal] << " to " << goal << " is: " << path_flow << "\n";
             }
     
             // Update residual capacities
@@ -565,11 +588,11 @@ class Graph {
                 }
             }
         }
-        double temp;
         for (int i : I_a) {
             std::string Ikey = "i" + std::to_string(i);
             flow_val += GetEdge(Ikey, "t", digraph_rk).flow;
         } 
+        std::cout << "Amount of loops: " << keepingcount << "\n";
     }
     
 
@@ -605,50 +628,6 @@ class Graph {
         }
         return false;
     }
-
-    bool redistribute_flow(const std::string& target_node, double needed_capacity) {
-        std::unordered_map<std::string, std::string> parent;
-        std::unordered_set<std::string> visited;
-    
-        std::function<bool(std::string)> dfs = [&](std::string u) {
-            visited.insert(u);
-            if (u == "s") return true;
-    
-            for (edges& e : digraph_rk) {
-                // Traverse reverse edges (i.e., flow > 0)
-                if (e.to == u && e.flow > err && visited.find(e.from) == visited.end()) {
-                    parent[e.from] = u;
-                    if (dfs(e.from)) return true;
-                }
-            }
-            return false;
-        };
-    
-        if (!dfs(target_node)) return false;
-    
-        // Find bottleneck along reverse path
-        double path_flow = needed_capacity;
-        for (std::string v = "s"; v != target_node; v = parent[v]) {
-            std::string u = parent[v];
-            for (edges& e : digraph_rk) {
-                if (e.to == u && e.from == v) {
-                    path_flow = std::min(path_flow, e.flow);
-                }
-            }
-        }
-    
-        // Apply flow reduction along reverse path
-        for (std::string v = "s"; v != target_node; v = parent[v]) {
-            std::string u = parent[v];
-            for (edges& e : digraph_rk) {
-                if (e.to == u && e.from == v) {
-                    e.flow -= path_flow;
-                }
-            }
-        }
-    
-        return true;
-    }    
 
     void objective() {
         int m = intervals_start.size();
