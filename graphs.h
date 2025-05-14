@@ -521,7 +521,7 @@ class Graph {
         int source = sX;
         int sink = tX;
         flow_val = 0;
-        std::vector<int> parent(NameMap.size(), 0);
+        std::vector<int> parent(NameMap.size(), -1);
 
         int keepingcount = 0;
 
@@ -593,13 +593,12 @@ class Graph {
 
     //Breadth First Search
     bool bfs(std::vector<int>& parent, const int& source, const int& sink, const std::vector<edges_matrix>& graph) {
-        std::vector<bool> visited(NameMap.size(), false);
         std::deque<int> q;
         q.push_front(source);
-        visited[source] = true;
-        parent.clear();
 
         int N = NameMap.size();
+        std::fill(parent.begin(), parent.end(), -1);
+        parent[source] = source;
     
         while (!q.empty()) {
             int u = q.front();
@@ -609,22 +608,24 @@ class Graph {
             for (const auto& [to, edgeIdx] : NameMap[u]) {
                 // `to` is the destination node name (e.g., "j0")
                 // `edgeIdx` is the unique index for edge (sX -> to)
-
-                if (!visited[to] && graph[edgeIdx].capacity - graph[edgeIdx].flow > err) {
-                    q.push_front(to);   //using a stack instead of a queue, LIFO instead of FIFO, results in a +- 8% speedup
-                    parent[to] = u;
-                    visited[to] = true;
-                    if (to == sink) return true;
+                if(graph[edgeIdx].capacity - graph[edgeIdx].flow > err){
+                    if (to == sink) {
+                        parent[to] = u;
+                        return true;
+                    }
+                    else if (parent[to] == -1) {
+                        q.push_front(to);   //using a stack instead of a queue, LIFO instead of FIFO, results in a +- 8% speedup
+                        parent[to] = u;
+                    }
                 }
             }
             
             for (int idx : reverse_adj[u]) {
                 int from = ReverseNameMap[idx].first;
                 int to = ReverseNameMap[idx].second;
-                if (!visited[from] && graph[idx].flow > err) {
+                if (parent[from] == -1 && graph[idx].flow > err) {
                     q.push_front(from);
                     parent[from] = to;
-                    visited[from] = true;
                 }
             }
         }
