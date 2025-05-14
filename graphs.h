@@ -522,20 +522,11 @@ class Graph {
         int sink = tX;
         flow_val = 0;
         std::vector<int> parent(NameMap.size(), -1);
+        parent[source] = source;
 
-        int keepingcount = 0;
-
-        bool bfstool = true;
-        double TOTALBFS = 0;
-
-        while (bfstool) {
-            keepingcount++;
+        while (bfs(parent, source, sink, G_rk)) {
             bool found = false;
             double path_flow = std::numeric_limits<double>::max();
-            clock_t z1 = clock();
-            bfstool = bfs(parent, source, sink, G_rk);
-            clock_t z2 = clock();
-            if (!bfstool) break;
 
             // Find bottleneck
             for (int v = sink; v != source; v = parent[v]) {
@@ -579,9 +570,6 @@ class Graph {
                     G_rk[idx].flow -= path_flow;
                 }
             }
-            TOTALBFS += (double)(z2-z1);
-            clock_t z3 = clock();
-            //print_time_summary(z1, z2, z3);
         }
         // Compute total flow from I_a nodes to sink
         for (int i : I_a) {
@@ -592,18 +580,15 @@ class Graph {
     
 
     //Breadth First Search
-    bool bfs(std::vector<int>& parent, const int& source, const int& sink, const std::vector<edges_matrix>& graph) {
+    inline bool bfs(std::vector<int>& parent, const int& source, const int& sink, const std::vector<edges_matrix>& graph) {
         std::deque<int> q;
         q.push_front(source);
 
-        int N = NameMap.size();
-        std::fill(parent.begin(), parent.end(), -1);
-        parent[source] = source;
+        std::fill(parent.begin()+1, parent.end(), -1);    //fill parent with -1 for all values.
     
         while (!q.empty()) {
             int u = q.front();
             q.pop_front();
-            
 
             for (const auto& [to, edgeIdx] : NameMap[u]) {
                 // `to` is the destination node name (e.g., "j0")

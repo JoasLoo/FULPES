@@ -47,14 +47,14 @@ from Bookkeeping import Bookkeeping
 
 
 
-instanceSize = 10 #number of EVs/jobs in instance
+instanceSize = 200 #number of EVs/jobs in instance
 timeStep = 900 #quarterly granularity
 maxFlowAlg = edmonds_karp #alternatively use e.g., edmonds_karp, preflow_push, or dinitz
-randomSample = True
+randomSample = False
 
 t0 = time.perf_counter()
 # Real Training data
-instanceData = pd.read_csv('Data/ev_session_data_OR.csv')
+instanceData = pd.read_csv('../Data/ev_session_data_OR.csv')
 
 t1 = time.perf_counter()
 
