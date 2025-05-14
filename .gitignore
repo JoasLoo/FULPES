@@ -2,8 +2,6 @@
 .vscode/
 
 # Ignore Windows batch files
-build.bat
-run.bat
 main.exe
 /FlowbasedOfflineChargingScheduler/build
 FlowbasedOfflineChargingScheduler/main.spec
