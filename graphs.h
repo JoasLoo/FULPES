@@ -164,6 +164,28 @@ class Graph {
             }
         }
     }
+
+    void build_reverse_adj() {
+    // Find the max node index used as 'to' so we can size reverse_adj
+    int max_index = 0;
+    for (const auto& [from, innerMap] : NameMap) {
+        for (const auto& [to, edgeIdx] : innerMap) {
+            if (to >= max_index) {
+                max_index = to + 1;
+            }
+        }
+    }
+
+    reverse_adj.clear();
+    reverse_adj.resize(max_index);  // Resize to fit all `to` indices
+
+    for (const auto& [from, innerMap] : NameMap) {
+        for (const auto& [to, edgeIdx] : innerMap) {
+            reverse_adj[to].push_back(edgeIdx);
+        }
+    }
+}
+
     
     void init_focs(InstanceData instance, int timeStep, int instancesize, bool randomize) {
 
@@ -281,11 +303,8 @@ class Graph {
             G[NameMap[from][to]].capacity = capacity;
         }     
 
-        for (const auto& [from, innerMap] : NameMap) {
-            for (const auto& [to, edgeIdx] : innerMap) {
-                reverse_adj[to].push_back(edgeIdx);  // Edge ends at `to`, so it’s a reverse edge for `to`
-            }
-        }
+
+        build_reverse_adj();
 
         G_r = G;
         total_demand_r = Get_M(G_r);  
@@ -700,7 +719,7 @@ class Graph {
     std::vector<edges_matrix> G, G_r, G_rk, f_matrix;
     std::unordered_map<int, std::map<int, int>> NameMap;
     std::unordered_map<int, std::pair<int, int>> ReverseNameMap;
-    std::unordered_map<int, std::vector<int>> reverse_adj;
+    std::vector<std::vector<int>> reverse_adj;
 
     double EDMONDSKARPTIME = 0;
     int timestep;
