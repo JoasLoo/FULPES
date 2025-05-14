@@ -160,6 +160,8 @@ class Graph {
         NameMap.resize(tX);
 
         //First add all names to NameMap and ReverseNameMap
+        ReverseNameMapF.push_back(0);
+        ReverseNameMapS.push_back(0);
         int edgeIndex = 1;      //Starting at 1 so if it defaults to 0 we know it couldnt find the edge.
 
         // Add all edge names to NameMap and ReverseNameMap
@@ -167,8 +169,8 @@ class Graph {
             int from = sX;
             int to = jX + j;
             NameMap[from][to] = edgeIndex;
-            ReverseNameMap[edgeIndex].first = from;
-            ReverseNameMap[edgeIndex].second = to;
+            ReverseNameMapF.push_back(from);
+            ReverseNameMapS.push_back(to);
             edgeIndex++;
         }
 
@@ -179,8 +181,8 @@ class Graph {
             for (int i : J_inverse[from]) {
                 int to = iX + i;
                 NameMap[from][to] = edgeIndex;
-                ReverseNameMap[edgeIndex].first = from;
-            ReverseNameMap[edgeIndex].second = to;
+                ReverseNameMapF.push_back(from);
+                ReverseNameMapS.push_back(to);
                 edgeIndex++;
             }
         }
@@ -189,10 +191,11 @@ class Graph {
             int from = iX + i;
             int to = tX;
             NameMap[from][to] = edgeIndex;
-            ReverseNameMap[edgeIndex].first = from;
-            ReverseNameMap[edgeIndex].second = to;
+            ReverseNameMapF.push_back(from);
+            ReverseNameMapS.push_back(to);
             edgeIndex++;
         }
+
 
         //dedicate enough space to all matrices.
         G = std::vector<edges_matrix>(edgeIndex);
@@ -350,22 +353,6 @@ class Graph {
 
     private: 
 
-    void print_graph(const std::vector<edges_matrix>& digraph) {
-    for (size_t i = 0; i < digraph.size(); ++i) {
-        const edges_matrix& edge = digraph[i];
-
-        auto it = ReverseNameMap.find(i);
-        if (it != ReverseNameMap.end()) {
-            const int& from = it->second.first;
-            const int& to = it->second.second;
-            std::cout << "From: " << from << " To: " << to
-                      << " | Capacity: " << edge.capacity
-                      << " | Flow: " << edge.flow << "\n";
-        }
-    }
-}
-
-
     void find_J() {
         for (int i : I_a) {
             int i_key = iX + i;
@@ -438,8 +425,8 @@ class Graph {
 
             for (int j : reverse_adj[Ikey]) {   //if goes towards iX
                 remove_from_s_to_jX = graph_rK[j].flow;
-                graph_rK[NameMap[sX][ReverseNameMap[j].first]].capacity -= remove_from_s_to_jX;
-                graph_rK[NameMap[sX][ReverseNameMap[j].first]].flow -= remove_from_s_to_jX;;
+                graph_rK[NameMap[sX][ReverseNameMapF[j]]].capacity -= remove_from_s_to_jX;
+                graph_rK[NameMap[sX][ReverseNameMapF[j]]].flow -= remove_from_s_to_jX;;
                 if(AddingF) {  // if F is initiated in another round, add the flows to F.
                     f_matrix[j].flow += graph_rK[j].flow;
                 }
@@ -549,10 +536,6 @@ class Graph {
                         found = true;
                     }
                 }
-
-                if (!found) {
-                    std::cerr << "Error: No valid path from " << parent[v] << " to " << v << std::endl;
-                }
             }
 
             // Update residual capacities
@@ -606,8 +589,8 @@ class Graph {
             }
             
             for (int idx : reverse_adj[u]) {
-                int from = ReverseNameMap[idx].first;
-                int to = ReverseNameMap[idx].second;
+                int from = ReverseNameMapF[idx];
+                int to = ReverseNameMapS[idx];
                 if (parent[from] == -1 && graph[idx].flow > err) {
                     q.push_front(from);
                     parent[from] = to;
@@ -675,7 +658,7 @@ class Graph {
 
     std::vector<edges_matrix> G, G_r, G_rk, f_matrix;
     std::vector<std::map<int, int>> NameMap;
-    std::unordered_map<int, std::pair<int, int>> ReverseNameMap;
+    std::vector<int> ReverseNameMapF, ReverseNameMapS;
     std::vector<std::vector<int>> reverse_adj;
 
     double EDMONDSKARPTIME = 0;

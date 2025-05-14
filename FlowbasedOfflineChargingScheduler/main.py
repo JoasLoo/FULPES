@@ -47,7 +47,7 @@ from Bookkeeping import Bookkeeping
 
 
 
-instanceSize = 200 #number of EVs/jobs in instance
+instanceSize = 400 #number of EVs/jobs in instance
 timeStep = 900 #quarterly granularity
 maxFlowAlg = edmonds_karp #alternatively use e.g., edmonds_karp, preflow_push, or dinitz
 randomSample = False
