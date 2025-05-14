@@ -29,9 +29,9 @@ int main() {
     Graph g;
     clock_t q2 = clock();
     
-    g.init_focs(instance1, timeStep, instanceSize, randomSample, 3600);
+    auto [G_r_capacity, G_r_flow, G_rk_capacity, G_rk_flow, f, I_a, NameMap, ReverseNameMap, reverse_adj] = g.init_focs(instance1, timeStep, instanceSize, randomSample, 3600);
     clock_t q3 = clock(); 
-    g.solve_focs();
+    g.solve_focs(G_r_capacity, G_r_flow, G_rk_capacity, G_rk_flow, f, I_a, NameMap, ReverseNameMap, reverse_adj);
     
     clock_t qx = clock();
 
