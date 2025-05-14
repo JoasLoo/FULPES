@@ -508,7 +508,7 @@ class Graph {
         int source = sX;
         int sink = tX;
         flow_val = 0;
-        std::unordered_map<int, int> parent;
+        std::vector<int> parent(NameMap.size(), 0);
 
         int keepingcount = 0;
 
@@ -583,8 +583,8 @@ class Graph {
     
 
     //Breadth First Search
-    bool bfs(std::unordered_map<int, int>& parent, const int& source, const int& sink, const std::vector<edges_matrix>& graph) {
-        std::unordered_map<int, bool> visited;
+    bool bfs(std::vector<int>& parent, const int& source, const int& sink, const std::vector<edges_matrix>& graph) {
+        std::vector<bool> visited(NameMap.size(), false);
         std::queue<int> q;
         q.push(source);
         visited[source] = true;
