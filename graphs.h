@@ -20,7 +20,6 @@
 #include <unordered_set>
 #include <functional>
 #include <iomanip>  // For std::setw and std::setprecision
-#include <tuple>
 
 inline std::vector<double> sample_vector_C(const std::vector<double>& input, int N, bool randomSample) {
     std::vector<double> result;
@@ -84,79 +83,18 @@ public:
 
 };
 
+struct edges_matrix {
+    double capacity;
+    double flow;
+
+    // Constructor
+    edges_matrix() : capacity(0), flow(0) {}
+    edges_matrix(double c, double fl) : capacity(c), flow(fl) {}
+};
+
 class Graph {
     public:
-
-    void print_graph(const std::vector<double>& digraph_cap, const std::vector<double>& digraph_flow, std::unordered_map<int, std::pair<int, int>> ReverseNameMap) {
-        std::cout << "-------------------------------------------- \n";
-    for (size_t i = 0; i < digraph_cap.size(); ++i) {
-        double flow = digraph_flow[i];
-        double capacity = digraph_cap[i];
-
-        auto it = ReverseNameMap.find(i);
-        if (it != ReverseNameMap.end()) {
-            const int& from = it->second.first;
-            const int& to = it->second.second;
-            std::cout << "From: " << from << " To: " << to
-                      << " | Capacity: " << capacity
-                      << " | Flow: " << flow << "\n";
-        }
-    }
-}
-
-
-    void find_J(std::unordered_map<int, std::vector<int>>& J, std::unordered_map<int, std::vector<int>>& J_inverse, std::vector<int> I_a) {
-        for (int i : I_a) {
-            int i_key = iX + i;
-            std::vector<int> related_jobs;
-        
-            for (int j : jobs) {
-                int j_key = jX + j;
-                const auto& job_list = J_inverse[j_key];
-                if (std::find(job_list.begin(), job_list.end(), i) != job_list.end()) {
-                    related_jobs.push_back(j);
-                }
-            }
-        
-            J[i_key] = related_jobs;
-        }        
-    }
-
-    void find_J_inverse(std::unordered_map<int, std::vector<int>>& J_inverse, std::vector<double> t0_x, std::vector<double> t1_x, std::vector<int> intervals_end, std::vector<int> intervals_start) {
-        for (int j = 0; j < jobs.size(); j++) {
-            int key = jX + j;
-            int t0 = t0_x[j];
-            int t1 = t1_x[j];
-    
-            // Find index of t0 in intervals_start
-            auto it_start = std::find(intervals_start.begin(), intervals_start.end(), t0);
-            auto it_end = std::find(intervals_end.begin(), intervals_end.end(), t1);
-    
-            if (it_start != intervals_start.end() && it_end != intervals_end.end()) {
-                int idx_start = std::distance(intervals_start.begin(), it_start);
-                int idx_end = std::distance(intervals_end.begin(), it_end);
-    
-                std::vector<int> indices;
-                for (int i = idx_start; i <= idx_end; ++i) {
-                    indices.push_back(i);
-                }
-    
-                J_inverse[key] = indices;
-            } else {
-                std::cerr << "Error: t0 or t1 not found in interval lists for job " << j << "\n";
-            }
-        }
-    }
-        //          G_r_capacity, G_r_flow, G_rk_capacity, G_rk_flow, f, I_a, NameMap, ReverseNameMap, reverse_adj 
-    std::tuple<std::vector<double>, std::vector<double>, std::vector<double>, std::vector<double>, std::vector<double>, std::vector<int>, std::unordered_map<int, std::map<int, int>>, std::unordered_map<int, std::pair<int, int>>, std::unordered_map<int, std::vector<int>>> init_focs(InstanceData instance, int timeStep, int instancesize, bool randomize, int timeBase) {
-
-        std::vector<double> jobs_cap;
-        std::vector<double> jobs_demand;
-        std::vector<int> jobs_departure;
-        std::vector<int> jobs_arrival;
-
-        std::vector<int> breakpoints;
-        std::vector<int> intervals_end;
+    void init_focs(InstanceData instance, int timeStep, int instancesize, bool randomize) {
 
         std::vector<double> average_power_W;
         std::vector<double> t0_x;
@@ -165,14 +103,13 @@ class Graph {
         std::vector<double> total_energy_Wh;
         std::vector<double> maxPower;
 
-        std::unordered_map<int, std::vector<int>> J;
-        std::unordered_map<int, std::vector<int>> J_inverse;
+        std::vector<double> jobs_cap;
+        std::vector<double> jobs_demand;
+        std::vector<int> jobs_departure;
+        std::vector<int> jobs_arrival;
+        std::vector<int> breakpoints;
 
-        std::vector<int> I_a;
-        std::vector<double> G, G_r_capacity, G_r_flow, G_rk_capacity, G_rk_flow, f;
-        std::unordered_map<int, std::map<int, int>> NameMap;
-        std::unordered_map<int, std::pair<int, int>> ReverseNameMap;
-        std::unordered_map<int, std::vector<int>> reverse_adj;
+        int n;
 
         timestep = timeStep;
         //init all
@@ -213,13 +150,15 @@ class Graph {
             len_i.push_back((breakpoints[i+1] - breakpoints[i]) * timestep);
         }
 
-        find_J(J, J_inverse, I_a);
-        find_J_inverse(J_inverse, t0_x, t1_x, intervals_end, intervals_start);
+        find_J();
+        find_J_inverse(t0_x, t1_x);
 
         //HERE INSTANTIATION OF MATRIX
 
         iX = jobs.size() + 1;
         tX = iX + I_a.size();
+        NameMap.resize(tX);
+
         //First add all names to NameMap and ReverseNameMap
         int edgeIndex = 1;      //Starting at 1 so if it defaults to 0 we know it couldnt find the edge.
 
@@ -256,11 +195,9 @@ class Graph {
         }
 
         //dedicate enough space to all matrices.
-        G = std::vector<double>(edgeIndex);
-        G_rk_capacity = G;
-        G_rk_flow = G;
-        G_r_flow = G;
-        f = G;
+        G = std::vector<edges_matrix>(edgeIndex);
+        G_rk = G;
+        f_matrix = G;
         //now we can access each matrix via: G[NameMap[sX]["j0"]].capacity = 1;
 
 
@@ -269,7 +206,7 @@ class Graph {
             int from = sX;
             int to = jX + j;
             double capacity = jobs_demand[j];
-            G[NameMap[from][to]] = capacity;
+            G[NameMap[from][to]].capacity = capacity;
         }
         
         for (int j : jobs) {
@@ -279,7 +216,7 @@ class Graph {
             for (int i : J_inverse[from]) {
                 int to = iX + i;
                 double capacity = cap_j * len_i[i] / timeBase;
-                G[NameMap[from][to]] = capacity;
+                G[NameMap[from][to]].capacity = capacity;
             }
         }
         
@@ -287,106 +224,29 @@ class Graph {
             int from = iX + i;
             int to = tX;
             double capacity = 0.0;  // If no value is given, use 0 or determine based on context
-            G[NameMap[from][to]] = capacity;
+            G[NameMap[from][to]].capacity = capacity;
         }     
 
-        for (const auto& [from, innerMap] : NameMap) {
-            for (const auto& [to, edgeIdx] : innerMap) {
-                reverse_adj[to].push_back(edgeIdx);  // Edge ends at `to`, so it’s a reverse edge for `to`
-            }
-        }
 
-        G_r_capacity = G;
+        build_reverse_adj();
 
-        total_demand_r = Get_M(G_r_capacity, NameMap);  
+        G_r = G;
+        total_demand_r = Get_M(G_r);  
         selfterminate = false;
         it = 0;
-
-        return std::make_tuple(G_r_capacity, G_r_flow, G_rk_capacity, G_rk_flow, f, I_a, NameMap, ReverseNameMap, reverse_adj);
     }
 
-    void reduce_network(std::vector<int> crit_r, std::vector<double>& graph_rK_flow, std::vector<double>& graph_rK_capacity, bool AddingF, std::unordered_map<int, std::pair<int, int>> ReverseNameMap, std::unordered_map<int, std::vector<int>> reverse_adj, std::vector<double> f, std::unordered_map<int, std::map<int, int>> NameMap) {
-        for (int i : crit_r) {
-            int Ikey = iX + i;
-            double remove_from_s_to_jX = 0;
-
-            for (int j : reverse_adj[Ikey]) {   //if goes towards iX
-                remove_from_s_to_jX = graph_rK_flow[j];
-                graph_rK_capacity[NameMap[sX][ReverseNameMap[j].first]] -= remove_from_s_to_jX;
-                graph_rK_flow[NameMap[sX][ReverseNameMap[j].first]] -= remove_from_s_to_jX;;
-                if(AddingF) {  // if F is initiated in another round, add the flows to F.
-                    f[j] += graph_rK_flow[j];
-                }
-            }
-
-            for (const auto& [to, j] : NameMap[Ikey]) { //for goes from iX
-                if(AddingF) {  // if F is initiated in another round, add the flows to F.
-                    f[j] += graph_rK_flow[j];
-                }
-                graph_rK_capacity[j] = 0;
-                graph_rK_flow[j] = 0;
-            }
-        }
-    }
-
-    void Add_to_f_end(std::vector<double>& graph_rK, std::vector<double>& f) {
-        for (int i = 0; i < graph_rK.size(); i++) {
-            f[i] += graph_rK[i];
-        }
-    }
-
-    void reset(std::vector<double>& GRAPH) {
-        for (int i = 0; i < GRAPH.size(); i++) {
-            GRAPH[i] = 0;
-        }
-    }
-
-    void update_network_capacities_g(std::vector<double>& G_rk, std::vector<int> I_a, std::unordered_map<int, std::map<int, int>> NameMap) {
-        double demand = 0;
-        double demand_normalized = 0;
-        if (it > 0) {
-            if (rd == 0) {
-                demand = MaxDiff;
-            }
-            else {
-                demand = MaxDiff-flow_val_saved;
-            }
-            
-            demand_normalized = demand / length_sum_intervals(I_a, len_i);
-            for (int i : I_a) {
-                int Ikey = iX + i;
-                G_rk[NameMap[Ikey][tX]] += demand_normalized * len_i[i];
-            }
-        }
-        else {
-            if (rd == 0) {
-                demand = Get_M(G_rk, NameMap);
-            }
-            else {
-                demand = Get_M(G_rk, NameMap)-flow_val_saved;
-            }
-            demand_normalized = demand / length_sum_intervals(I_a, len_i);
-            for (int i : I_a) {
-                int Ikey = iX + i;
-                G_rk[NameMap[Ikey][tX]] = demand_normalized * len_i[i];
-            }
-
-            //std::cout << "Demand: " << demand << " length_sum_intervals(I_a, len_i) " << length_sum_intervals(I_a, len_i) << "\n";
-        }
-    }
-
-
-    void solve_focs(std::vector<double> G_r_capacity, std::vector<double> G_r_flow, std::vector<double> G_rk_capacity, std::vector<double> G_rk_flow, std::vector<double> f, std::vector<int> I_a, std::unordered_map<int, std::map<int, int>> NameMap, std::unordered_map<int, std::pair<int, int>> ReverseNameMap, std::unordered_map<int, std::vector<int>> reverse_adj) {
-        reset(f);
+    void solve_focs() {
+        reset_caps(f_matrix);
+        reset_flows(f_matrix);
         while (!selfterminate) {
             if(it == 0) {
-                G_rk_capacity = G_r_capacity;
-                G_rk_flow = G_r_flow;
+                G_rk = G_r;
             }
-            update_network_capacities_g(G_rk_capacity, I_a, NameMap);
+            update_network_capacities_g();
             //Edmonds_Karp();
-            Max_flow_solver(G_rk_flow, G_rk_capacity, ReverseNameMap, NameMap, I_a, reverse_adj);
-            MaxDiff = Get_M(G_rk_capacity, NameMap) - flow_val; 
+            Max_flow_solver();
+            MaxDiff = Get_M(G_rk) - flow_val; 
             
             if (total_demand_r-flow_val < err) {
                 //end round
@@ -396,10 +256,9 @@ class Graph {
                 int toKey = tX;
                 for (int i : I_a) {
                     int fromKey = iX + i;
-                    double Capacity = G_rk_capacity[NameMap[fromKey][toKey]];
-                    double Flow = G_rk_flow[NameMap[fromKey][toKey]];
+                    edges_matrix TheEdge = G_rk[NameMap[fromKey][toKey]];
 
-                    bool isCritical = (Capacity - Flow > err);
+                    bool isCritical = (TheEdge.capacity - TheEdge.flow > err);
                     subCrit_mask.push_back(isCritical);
                 }
 
@@ -426,18 +285,18 @@ class Graph {
                 I_crit.push_back(temp);
                 if (I_p.size() == 0) {
                     selfterminate = true;
-                    Add_to_f_end(G_rk_flow, f);
+                    Add_to_f_end(G_rk);
                 }
                 else {
                     I_crit_r = I_crit.back();
                     AddingF = true;
-                    reduce_network(I_crit_r, G_rk_flow, G_rk_capacity, AddingF, ReverseNameMap, reverse_adj, f, NameMap);
+                    reduce_network(I_crit_r, G_rk);
                     AddingF = false;
                     I_a = I_p;                     // Copy the contents of I_p to I_a
                     std::sort(I_a.begin(), I_a.end());  // Sort I_a in ascending order
                     I_p.clear();
 
-                    total_demand_r = Get_M(G_r_capacity, NameMap)-flow_val_saved;
+                    total_demand_r = Get_M(G_r)-flow_val_saved;
 
                     flow_val_saved += flow_val;
                 
@@ -451,10 +310,8 @@ class Graph {
                 int toKey = tX;
                 for (int i : I_a) {
                     int fromKey = iX + i;
-                    double Capacity = G_rk_capacity[NameMap[fromKey][toKey]];
-                    double Flow = G_rk_flow[NameMap[fromKey][toKey]];
-
-                    bool isCritical = (Capacity - Flow > err);
+                    edges_matrix TheEdge = G_rk[NameMap[fromKey][toKey]];
+                    bool isCritical = (TheEdge.capacity - TheEdge.flow > err);
                     subCrit_mask.push_back(isCritical);
                 }
 
@@ -465,9 +322,9 @@ class Graph {
                     }
                 }
 
-                reduce_network(subCrit, G_rk_flow, G_rk_capacity, AddingF, ReverseNameMap, reverse_adj, f, NameMap);
+                reduce_network(subCrit, G_rk);
 
-                total_demand_r = Get_M(G_rk_capacity, NameMap)-flow_val_saved;
+                total_demand_r = Get_M(G_rk)-flow_val_saved;
 
                 I_p.insert(I_p.end(), subCrit.begin(), subCrit.end());
 
@@ -486,28 +343,185 @@ class Graph {
             }
         }
         if (it <= 10) {
-            objective(3600, NameMap, f);
+            objective();
             printf("X) TOTAL EDMONDS KARP               %.5f seconds\n", EDMONDSKARPTIME / CLOCKS_PER_SEC); 
-            printf("X) TOTAL BFS                        %.5f seconds\n", totalBFS / CLOCKS_PER_SEC); 
-            printf("X) REST EDMONDS KARP                %.5f seconds\n", restEdmondsKarp / CLOCKS_PER_SEC); 
+        }
+    }
+
+    private: 
+
+    void print_graph(const std::vector<edges_matrix>& digraph) {
+    for (size_t i = 0; i < digraph.size(); ++i) {
+        const edges_matrix& edge = digraph[i];
+
+        auto it = ReverseNameMap.find(i);
+        if (it != ReverseNameMap.end()) {
+            const int& from = it->second.first;
+            const int& to = it->second.second;
+            std::cout << "From: " << from << " To: " << to
+                      << " | Capacity: " << edge.capacity
+                      << " | Flow: " << edge.flow << "\n";
+        }
+    }
+}
+
+
+    void find_J() {
+        for (int i : I_a) {
+            int i_key = iX + i;
+            std::vector<int> related_jobs;
+        
+            for (int j : jobs) {
+                int j_key = jX + j;
+                const auto& job_list = J_inverse[j_key];
+                if (std::find(job_list.begin(), job_list.end(), i) != job_list.end()) {
+                    related_jobs.push_back(j);
+                }
+            }
+        
+            J[i_key] = related_jobs;
+        }        
+    }
+
+    void find_J_inverse(std::vector<double> t0_x, std::vector<double> t1_x) {
+        for (int j = 0; j < jobs.size(); j++) {
+            int key = jX + j;
+            int t0 = t0_x[j];
+            int t1 = t1_x[j];
+    
+            // Find index of t0 in intervals_start
+            auto it_start = std::find(intervals_start.begin(), intervals_start.end(), t0);
+            auto it_end = std::find(intervals_end.begin(), intervals_end.end(), t1);
+    
+            if (it_start != intervals_start.end() && it_end != intervals_end.end()) {
+                int idx_start = std::distance(intervals_start.begin(), it_start);
+                int idx_end = std::distance(intervals_end.begin(), it_end);
+    
+                std::vector<int> indices;
+                for (int i = idx_start; i <= idx_end; ++i) {
+                    indices.push_back(i);
+                }
+    
+                J_inverse[key] = indices;
+            } else {
+                std::cerr << "Error: t0 or t1 not found in interval lists for job " << j << "\n";
+            }
+        }
+    }
+
+    void build_reverse_adj() {
+        // Find max 'to' node index from the inner maps
+        int max_index = 0;
+        for (int from = 0; from < NameMap.size(); ++from) {
+            for (const auto& [to, edgeIdx] : NameMap[from]) {
+                if (to >= max_index) {
+                    max_index = to + 1;
+                }
+            }
+        }
+
+        reverse_adj.clear();
+        reverse_adj.resize(max_index);
+
+        for (int from = 0; from < NameMap.size(); ++from) {
+            for (const auto& [to, edgeIdx] : NameMap[from]) {
+                reverse_adj[to].push_back(edgeIdx);
+            }
+        }
+    }
+
+
+    void reduce_network(std::vector<int> crit_r, std::vector<edges_matrix>& graph_rK) {
+        for (int i : crit_r) {
+            int Ikey = iX + i;
+            double remove_from_s_to_jX = 0;
+
+            for (int j : reverse_adj[Ikey]) {   //if goes towards iX
+                remove_from_s_to_jX = graph_rK[j].flow;
+                graph_rK[NameMap[sX][ReverseNameMap[j].first]].capacity -= remove_from_s_to_jX;
+                graph_rK[NameMap[sX][ReverseNameMap[j].first]].flow -= remove_from_s_to_jX;;
+                if(AddingF) {  // if F is initiated in another round, add the flows to F.
+                    f_matrix[j].flow += graph_rK[j].flow;
+                }
+            }
+
+            for (const auto& [to, j] : NameMap[Ikey]) { //for goes from iX
+                if(AddingF) {  // if F is initiated in another round, add the flows to F.
+                    f_matrix[j].flow += graph_rK[j].flow;
+                }
+                graph_rK[j].capacity = 0;
+                graph_rK[j].flow = 0;
+            }
+        }
+    }
+
+    void Add_to_f_end(std::vector<edges_matrix>& graph_rK) {
+        for (int i = 0; i < graph_rK.size(); i++) {
+            f_matrix[i].flow += graph_rK[i].flow;
+        }
+    }
+
+    void reset_flows(std::vector<edges_matrix>& GRAPH) {
+        for (int i = 0; i < GRAPH.size(); i++) {
+            GRAPH[i].flow = 0;
+        }
+    }
+
+    void reset_caps(std::vector<edges_matrix>& GRAPH) {
+        for (int i = 0; i < GRAPH.size(); i++) {
+            GRAPH[i].capacity = 0;
+        }
+    }
+
+    void update_network_capacities_g() {
+        double demand = 0;
+        double demand_normalized = 0;
+        if (it > 0) {
+            if (rd == 0) {
+                demand = MaxDiff;
+            }
+            else {
+                demand = MaxDiff-flow_val_saved;
+            }
+            
+            demand_normalized = demand / length_sum_intervals(I_a, len_i);
+            for (int i : I_a) {
+                int Ikey = iX + i;
+                G_rk[NameMap[Ikey][tX]].capacity += demand_normalized * len_i[i];
+            }
+        }
+        else {
+            if (rd == 0) {
+                demand = Get_M(G_rk);
+            }
+            else {
+                demand = Get_M(G_rk)-flow_val_saved;
+            }
+            demand_normalized = demand / length_sum_intervals(I_a, len_i);
+            for (int i : I_a) {
+                int Ikey = iX + i;
+                G_rk[NameMap[Ikey][tX]].capacity = demand_normalized * len_i[i];
+            }
+
+            //std::cout << "Demand: " << demand << " length_sum_intervals(I_a, len_i) " << length_sum_intervals(I_a, len_i) << "\n";
         }
     }
     
-    void Max_flow_solver(std::vector<double> G_rk_flow, std::vector<double> G_rk_capacity, std::unordered_map<int, std::pair<int, int>> ReverseNameMap, std::unordered_map<int, std::map<int, int>> NameMap, std::vector<int> I_a, std::unordered_map<int, std::vector<int>> reverse_adj) {    //G_rk_flow, G_rk_capacity, ReverseNameMap, NameMap, I_a, reverse_adj
+    void Max_flow_solver() {
         clock_t z1 = clock();
-        reset(G_rk_flow);   // Reset all flows to 0 for a DFS effect
-        Edmonds_Karp(G_rk_flow, G_rk_capacity, ReverseNameMap, NameMap, I_a, reverse_adj);
+        reset_flows(G_rk);   // Reset all flows to 0 for a DFS effect
+        Edmonds_Karp();
         clock_t z2 = clock();
         EDMONDSKARPTIME += (double)(z2-z1);
     }
-    double totalBFS = 0;
-    double restEdmondsKarp = 0;
 
-    void Edmonds_Karp(std::vector<double> G_rk_flow, std::vector<double> G_rk_capacity, std::unordered_map<int, std::pair<int, int>> ReverseNameMap, std::unordered_map<int, std::map<int, int>> NameMap, std::vector<int> I_a, std::unordered_map<int, std::vector<int>> reverse_adj) {
+
+
+    void Edmonds_Karp() {
         int source = sX;
         int sink = tX;
         flow_val = 0;
-        std::unordered_map<int, int> parent;
+        std::vector<int> parent(NameMap.size(), 0);
 
         int keepingcount = 0;
 
@@ -519,9 +533,9 @@ class Graph {
             bool found = false;
             double path_flow = std::numeric_limits<double>::max();
             clock_t z1 = clock();
-            bfstool = bfs(parent, source, sink, G_rk_flow, G_rk_capacity, ReverseNameMap, NameMap, reverse_adj);
-            if (!bfstool) break;
+            bfstool = bfs(parent, source, sink, G_rk);
             clock_t z2 = clock();
+            if (!bfstool) break;
 
             // Find bottleneck
             for (int v = sink; v != source; v = parent[v]) {
@@ -531,17 +545,16 @@ class Graph {
                     Reverse = true;
                     idx = NameMap[v][parent[v]];
                 }
-                double x = G_rk_capacity[idx];
-                double y = G_rk_flow[idx];
+                edges_matrix x = G_rk[idx];
 
                 if (!Reverse) {
-                    if (x - y > err) {
-                        path_flow = std::min(path_flow, x - y);
+                    if (x.capacity - x.flow > err) {
+                        path_flow = std::min(path_flow, x.capacity - x.flow);
                         found = true;
                     }
                 } else {
-                    if (y > err) {
-                        path_flow = std::min(path_flow, y);
+                    if (x.flow > err) {
+                        path_flow = std::min(path_flow, x.flow);
                         found = true;
                     }
                 }
@@ -558,30 +571,31 @@ class Graph {
                 if (idx == 0) Reverse = true;
 
                 if (!Reverse) {
-                    if (G_rk_capacity[idx] - G_rk_flow[idx] > err) {
-                        G_rk_flow[idx] += path_flow;
+                    if (G_rk[idx].capacity - G_rk[idx].flow > err) {
+                        G_rk[idx].flow += path_flow;
                     }
                 } else {
                     idx = NameMap[v][parent[v]];
-                    G_rk_flow[idx] -= path_flow;
+                    G_rk[idx].flow -= path_flow;
                 }
             }
+            TOTALBFS += (double)(z2-z1);
             clock_t z3 = clock();
-            totalBFS += (double)(z2-z1);
-            restEdmondsKarp += (double)(z3-z2);
+            //print_time_summary(z1, z2, z3);
         }
         // Compute total flow from I_a nodes to sink
         for (int i : I_a) {
             int Ikey = iX + i;
-            flow_val += G_rk_flow[NameMap[Ikey][tX]];
+            flow_val += G_rk[NameMap[Ikey][tX]].flow;
         }
     }
+    
 
     //Breadth First Search
-    bool bfs(std::unordered_map<int, int>& parent, const int& source, const int& sink, const std::vector<double> graph_flow, const std::vector<double> graph_capacity, std::unordered_map<int, std::pair<int, int>> ReverseNameMap, std::unordered_map<int, std::map<int, int>> NameMap, std::unordered_map<int, std::vector<int>> reverse_adj) {
-        std::unordered_map<int, bool> visited;
-        std::queue<int> q;
-        q.push(source);
+    bool bfs(std::vector<int>& parent, const int& source, const int& sink, const std::vector<edges_matrix>& graph) {
+        std::vector<bool> visited(NameMap.size(), false);
+        std::deque<int> q;
+        q.push_front(source);
         visited[source] = true;
         parent.clear();
 
@@ -589,43 +603,40 @@ class Graph {
     
         while (!q.empty()) {
             int u = q.front();
-            q.pop();
-            bool continue_outer = false;
+            q.pop_front();
+            
 
             for (const auto& [to, edgeIdx] : NameMap[u]) {
                 // `to` is the destination node name (e.g., "j0")
                 // `edgeIdx` is the unique index for edge (sX -> to)
 
-                if (!visited[to] && graph_capacity[edgeIdx] - graph_flow[edgeIdx] > err) {
-                    q.push(to);
+                if (!visited[to] && graph[edgeIdx].capacity - graph[edgeIdx].flow > err) {
+                    q.push_front(to);   //using a stack instead of a queue, LIFO instead of FIFO, results in a +- 8% speedup
                     parent[to] = u;
                     visited[to] = true;
                     if (to == sink) return true;
-                    continue_outer = true;
                 }
             }
-            if (continue_outer) continue;
             
             for (int idx : reverse_adj[u]) {
-                const int& from = ReverseNameMap[idx].first;
-                const int& to = ReverseNameMap[idx].second;
-                if (to == u && !visited[from] && graph_flow[idx] > err) {
-                    q.push(from);
+                int from = ReverseNameMap[idx].first;
+                int to = ReverseNameMap[idx].second;
+                if (!visited[from] && graph[idx].flow > err) {
+                    q.push_front(from);
                     parent[from] = to;
                     visited[from] = true;
-                    continue_outer = true;
                 }
             }
         }
         return false;
     }
 
-    void objective(int timeBase, std::unordered_map<int, std::map<int, int>> NameMap, std::vector<double> f) {
+    void objective() {
         int m = intervals_start.size();
         std::vector<double> p_i(m);
         for (int i = 0; i < m; i++) {
             int Ikey = iX + i;
-            double flow = f[NameMap[Ikey][tX]];
+            double flow = f_matrix[NameMap[Ikey][tX]].flow;
             p_i[i] = (flow / len_i[i]) * timeBase;
         }
         std::vector<double> powerSquare(m);
@@ -634,12 +645,9 @@ class Graph {
         }
 
         objNormalized = std::accumulate(powerSquare.begin(), powerSquare.end(), 0.0);
-        std::cout << "\nObjective value C++ = " << objNormalized << "\n";
+        std::cout << "Objective value C++ = " << objNormalized << "\n";
         //return objNormalized;
     }
-    
-
-    private: 
 
     inline double length_sum_intervals(const std::vector<int>& I_list, const std::vector<int>& L_list) {
         double sum = 0.0;  // Initialize sum to 0
@@ -649,32 +657,40 @@ class Graph {
         return sum;  // Return the total
     }
 
-    double Get_M(std::vector<double> X, std::unordered_map<int, std::map<int, int>> NameMap) {
+    double Get_M(std::vector<edges_matrix> X) {
             double M = 0;
             for (int j : jobs) {    //jobs is correct.
                 int jobKey = jX + j;
                 if (M == 0) {
-                    M = X[NameMap[sX][jobKey]];
+                    M = X[NameMap[sX][jobKey]].capacity;
                 }
                 else {
-                    M += X[NameMap[sX][jobKey]];
+                    M += X[NameMap[sX][jobKey]].capacity;
                 }
             }
             return M;
     }
 
+    int timeBase = 3600;
     std::vector<int> jobs;
-    int n;
+
+    std::unordered_map<int, std::vector<int>> J;
+    std::unordered_map<int, std::vector<int>> J_inverse;
 
     
     std::vector<int> intervals_start;
-
-    std::vector<int> I_p, I_crit_r;
+    std::vector<int> intervals_end;
+    std::vector<int> I_a, I_p, I_crit_r;
     std::vector<int> len_i;
     std::vector<std::vector<int>> I_crit;
 
     std::vector<bool> subCrit_mask;
     std::vector<int> subCrit;
+
+    std::vector<edges_matrix> G, G_r, G_rk, f_matrix;
+    std::vector<std::map<int, int>> NameMap;
+    std::unordered_map<int, std::pair<int, int>> ReverseNameMap;
+    std::vector<std::vector<int>> reverse_adj;
 
     double EDMONDSKARPTIME = 0;
     int timestep;
@@ -684,8 +700,6 @@ class Graph {
     int sX = 0, jX = 1, tX = 0, iX = 0;
 
     double err = 0.0000001;
-    bool MPCstopper = false;
-    int MPCcondition = 0;
     bool selfterminate;
     double total_demand_r = 0;
     double objNormalized;

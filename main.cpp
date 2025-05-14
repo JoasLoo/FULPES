@@ -7,12 +7,15 @@
 using namespace std;
 
 
-const int instanceSize = 200; //number of EVs/jobs in instance
+const int instanceSize = 500; //number of EVs/jobs in instance
 int timeStep = 900; //quarterly granularity
 
 bool randomSample = false;
 
+vector<int> FOCS_breakpoints;
+
 InstanceData opendata_toC(const string& filename);
+
 
 int main() {
     FILE *data; 
@@ -20,8 +23,7 @@ int main() {
     if(data == NULL) { //Check if data file opened succesfully
         printf("Cant open data.csv");
         exit(0);
-    }
-    
+    }  
     clock_t t1 = clock();
     InstanceData instance1 = opendata_toC("Data/DEMSdata_FOCS_v1.csv");
     clock_t q1 = clock();
@@ -29,9 +31,10 @@ int main() {
     Graph g;
     clock_t q2 = clock();
     
-    auto [G_r_capacity, G_r_flow, G_rk_capacity, G_rk_flow, f, I_a, NameMap, ReverseNameMap, reverse_adj] = g.init_focs(instance1, timeStep, instanceSize, randomSample, 3600);
-    clock_t q3 = clock(); 
-    g.solve_focs(G_r_capacity, G_r_flow, G_rk_capacity, G_rk_flow, f, I_a, NameMap, ReverseNameMap, reverse_adj);
+    g.init_focs(instance1, timeStep, instanceSize, randomSample);
+    clock_t q3 = clock();
+    //g.print_graph();   
+    g.solve_focs();
     
     clock_t qx = clock();
 
@@ -44,8 +47,6 @@ int main() {
     fclose(data);
     return 0;
 }
-
-
 
 bool starts_with(const std::string& str, const std::string& prefix) {
     return str.size() >= prefix.size() &&
