@@ -594,8 +594,8 @@ class Graph {
     //Breadth First Search
     bool bfs(std::vector<int>& parent, const int& source, const int& sink, const std::vector<edges_matrix>& graph) {
         std::vector<bool> visited(NameMap.size(), false);
-        std::queue<int> q;
-        q.push(source);
+        std::deque<int> q;
+        q.push_front(source);
         visited[source] = true;
         parent.clear();
 
@@ -603,7 +603,7 @@ class Graph {
     
         while (!q.empty()) {
             int u = q.front();
-            q.pop();
+            q.pop_front();
             
 
             for (const auto& [to, edgeIdx] : NameMap[u]) {
@@ -611,11 +611,10 @@ class Graph {
                 // `edgeIdx` is the unique index for edge (sX -> to)
 
                 if (!visited[to] && graph[edgeIdx].capacity - graph[edgeIdx].flow > err) {
-                    q.push(to);
+                    q.push_front(to);   //using a stack instead of a queue, LIFO instead of FIFO, results in a +- 8% speedup
                     parent[to] = u;
                     visited[to] = true;
                     if (to == sink) return true;
-                    //break;  // Skip rest and go to next while loop iteration
                 }
             }
             
@@ -623,10 +622,9 @@ class Graph {
                 int from = ReverseNameMap[idx].first;
                 int to = ReverseNameMap[idx].second;
                 if (!visited[from] && graph[idx].flow > err) {
-                    q.push(from);
+                    q.push_front(from);
                     parent[from] = to;
                     visited[from] = true;
-                    //break;  // Skip rest and go to next while loop iteration
                 }
             }
         }
