@@ -122,7 +122,7 @@ class Graph {
 }
 
 
-    void find_J() {
+    void find_J(std::unordered_map<int, std::vector<int>>& J, std::unordered_map<int, std::vector<int>>& J_inverse) {
         for (int i : I_a) {
             int i_key = iX + i;
             std::vector<int> related_jobs;
@@ -139,7 +139,7 @@ class Graph {
         }        
     }
 
-    void find_J_inverse() {
+    void find_J_inverse(std::unordered_map<int, std::vector<int>>& J_inverse, std::vector<double> t0_x, std::vector<double> t1_x, std::vector<int> intervals_end, std::vector<int> intervals_start) {
         for (int j = 0; j < jobs.size(); j++) {
             int key = jX + j;
             int t0 = t0_x[j];
@@ -165,7 +165,25 @@ class Graph {
         }
     }
     
-    void init_focs(InstanceData instance, int timeStep, int instancesize, bool randomize) {
+    void init_focs(InstanceData instance, int timeStep, int instancesize, bool randomize, int timeBase) {
+
+        std::vector<double> jobs_cap;
+        std::vector<double> jobs_demand;
+        std::vector<int> jobs_departure;
+        std::vector<int> jobs_arrival;
+
+        std::vector<int> breakpoints;
+        std::vector<int> intervals_end;
+
+        std::vector<double> average_power_W;
+        std::vector<double> t0_x;
+        std::vector<double> t1_x;
+        std::vector<double> total_energy;
+        std::vector<double> total_energy_Wh;
+        std::vector<double> maxPower;
+
+        std::unordered_map<int, std::vector<int>> J;
+        std::unordered_map<int, std::vector<int>> J_inverse;
 
         timestep = timeStep;
         //init all
@@ -206,8 +224,8 @@ class Graph {
             len_i.push_back((breakpoints[i+1] - breakpoints[i]) * timestep);
         }
 
-        find_J();
-        find_J_inverse();
+        find_J(J, J_inverse);
+        find_J_inverse(J_inverse, t0_x, t1_x, intervals_end, intervals_start);
 
         //HERE INSTANTIATION OF MATRIX
 
@@ -478,7 +496,7 @@ class Graph {
             }
         }
         if (it <= 10) {
-            objective();
+            objective(3600);
             printf("X) TOTAL EDMONDS KARP               %.5f seconds\n", EDMONDSKARPTIME / CLOCKS_PER_SEC); 
         }
     }
@@ -575,10 +593,6 @@ class Graph {
             int Ikey = iX + i;
             flow_val += G_rk[NameMap[Ikey][tX]].flow;
         }
-
-        //std::cout << "TOTALBFS: " << TOTALBFS << "\n";
-        
-        //std::cout << "Amount of loops: " << keepingcount << "\n"; 
     }
     
 
@@ -591,6 +605,8 @@ class Graph {
         parent.clear();
 
         int N = NameMap.size();
+        int Q = 0;
+        int T = 0;
     
         while (!q.empty()) {
             int u = q.front();
@@ -607,10 +623,8 @@ class Graph {
                     visited[to] = true;
                     if (to == sink) return true;
                     continue_outer = true;
-                    //break;  // Skip rest and go to next while loop iteration
                 }
             }
-
             if (continue_outer) continue;
             
             for (int idx : reverse_adj[u]) {
@@ -620,14 +634,14 @@ class Graph {
                     q.push(from);
                     parent[from] = to;
                     visited[from] = true;
-                    //break;  // Skip rest and go to next while loop iteration
+                    continue_outer = true;
                 }
             }
         }
         return false;
     }
 
-    void objective() {
+    void objective(int timeBase) {
         int m = intervals_start.size();
         std::vector<double> p_i(m);
         for (int i = 0; i < m; i++) {
@@ -641,7 +655,7 @@ class Graph {
         }
 
         objNormalized = std::accumulate(powerSquare.begin(), powerSquare.end(), 0.0);
-        std::cout << "Objective value C++ = " << objNormalized << "\n";
+        std::cout << "\nObjective value C++ = " << objNormalized << "\n";
         //return objNormalized;
     }
     
@@ -670,20 +684,12 @@ class Graph {
             return M;
     }
 
-    std::unordered_map<int, std::vector<int>> J;
-    std::unordered_map<int, std::vector<int>> J_inverse;
-
-    int timeBase = 3600;
     std::vector<int> jobs;
-    std::vector<double> jobs_cap;
-    std::vector<double> jobs_demand;
-    std::vector<int> jobs_departure;
-    std::vector<int> jobs_arrival;
     int n;
 
-    std::vector<int> breakpoints;
+    
     std::vector<int> intervals_start;
-    std::vector<int> intervals_end;
+
     std::vector<int> I_a, I_p, I_crit_r;
     std::vector<int> len_i;
     std::vector<std::vector<int>> I_crit;
@@ -691,12 +697,7 @@ class Graph {
     std::vector<bool> subCrit_mask;
     std::vector<int> subCrit;
 
-    std::vector<double> average_power_W;
-    std::vector<double> t0_x;
-    std::vector<double> t1_x;
-    std::vector<double> total_energy;
-    std::vector<double> total_energy_Wh;
-    std::vector<double> maxPower;
+    
     std::vector<edges_matrix> G, G_r, G_rk, f_matrix;
     std::unordered_map<int, std::map<int, int>> NameMap;
     std::unordered_map<int, std::pair<int, int>> ReverseNameMap;
