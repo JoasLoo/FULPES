@@ -412,25 +412,39 @@ class Graph {
     }
 
     void build_reverse_adj() {
-        // Find max 'to' node index from the inner maps
-        int max_index = 0;
-        for (int from = 0; from < NameMap.size(); ++from) {
-            for (const auto& [to, edgeIdx] : NameMap[from]) {
-                if (to >= max_index) {
-                    max_index = to + 1;
-                }
-            }
-        }
-
-        reverse_adj.clear();
-        reverse_adj.resize(max_index);
-
-        for (int from = 0; from < NameMap.size(); ++from) {
-            for (const auto& [to, edgeIdx] : NameMap[from]) {
-                reverse_adj[to].push_back(edgeIdx);
+    // Step 1: Find max 'to' node index
+    int max_index = 0;
+    for (int from = 0; from < NameMap.size(); ++from) {
+        for (const auto& [to, edgeIdx] : NameMap[from]) {
+            if (to >= max_index) {
+                max_index = to + 1;
             }
         }
     }
+
+    // Step 2: Count how many edges point to each node
+    std::vector<int> in_degree(max_index, 0);
+    for (int from = 0; from < NameMap.size(); ++from) {
+        for (const auto& [to, _] : NameMap[from]) {
+            ++in_degree[to];
+        }
+    }
+
+    // Step 3: Initialize and reserve space for reverse_adj
+    reverse_adj.clear();
+    reverse_adj.resize(max_index);
+    for (int i = 0; i < max_index; ++i) {
+        reverse_adj[i].reserve(in_degree[i]);
+    }
+
+    // Step 4: Fill reverse_adj
+    for (int from = 0; from < NameMap.size(); ++from) {
+        for (const auto& [to, edgeIdx] : NameMap[from]) {
+            reverse_adj[to].push_back(edgeIdx);
+        }
+    }
+}
+
 
 
     void reduce_network(std::vector<int> crit_r, std::vector<edges_matrix>& graph_rK) {
