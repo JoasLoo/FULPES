@@ -92,6 +92,14 @@ struct edges_matrix {
     edges_matrix(double c, double fl) : capacity(c), flow(fl) {}
 };
 
+struct NameMapHelp {
+    int to;
+    int ptr;
+
+    NameMapHelp() : to(0), ptr(0) {}
+    NameMapHelp(int t, int p) : to(t), ptr(p) {}
+};
+
 class Graph {
     public:
     void init_focs(InstanceData instance, int timeStep, int instancesize, bool randomize) {
@@ -158,6 +166,7 @@ class Graph {
         iX = jobs.size() + 1;
         tX = iX + I_a.size();
         NameMap.resize(tX);
+        FastNameMap.resize(tX);
 
         //First add all names to NameMap and ReverseNameMap
         ReverseNameMapF.push_back(0);
@@ -168,6 +177,7 @@ class Graph {
         for (int j : jobs) {
             int from = sX;
             int to = jX + j;
+            FastNameMap[from].push_back(NameMapHelp(to, edgeIndex));
             NameMap[from][to] = edgeIndex;
             ReverseNameMapF.push_back(from);
             ReverseNameMapS.push_back(to);
@@ -180,6 +190,7 @@ class Graph {
             
             for (int i : J_inverse[from]) {
                 int to = iX + i;
+                FastNameMap[from].push_back(NameMapHelp(to, edgeIndex));
                 NameMap[from][to] = edgeIndex;
                 ReverseNameMapF.push_back(from);
                 ReverseNameMapS.push_back(to);
@@ -190,6 +201,7 @@ class Graph {
         for (int i : I_a) {
             int from = iX + i;
             int to = tX;
+            FastNameMap[from].push_back(NameMapHelp(to, edgeIndex));
             NameMap[from][to] = edgeIndex;
             ReverseNameMapF.push_back(from);
             ReverseNameMapS.push_back(to);
@@ -348,6 +360,7 @@ class Graph {
         if (it <= 10) {
             objective();
             printf("X) TOTAL EDMONDS KARP               %.5f seconds\n", EDMONDSKARPTIME / CLOCKS_PER_SEC); 
+            printf("X) TOTAL BFS                        %.5f seconds\n", totalBFS / CLOCKS_PER_SEC);
         }
     }
 
@@ -502,7 +515,48 @@ class Graph {
         EDMONDSKARPTIME += (double)(z2-z1);
     }
 
+    //Breadth First Search
+    bool bfs(std::vector<int>& parent, const int& source, const int& sink, const std::vector<edges_matrix>& graph) {
+        std::deque<int> q;
+        q.push_front(source);
 
+        std::fill(parent.begin()+1, parent.end(), -1);    //fill parent with -1 for all values.
+        edges_matrix a;
+        int u = 0;
+    
+        while (!q.empty()) {
+            u = q.front();
+            q.pop_front();
+
+            for (const auto& [to, edgeIdx] : FastNameMap[u]) {
+                a = graph[edgeIdx];
+                // `to` is the destination node name (e.g., "j0")
+                // `edgeIdx` is the unique index for edge (sX -> to)
+                if(a.capacity - a.flow > err){
+                    if (to == sink) {
+                        parent[to] = u;
+                        return true;
+                    }
+                    else if (parent[to] == -1) {
+                        q.push_front(to);   //using a stack instead of a queue, LIFO instead of FIFO, results in a +- 8% speedup
+                        parent[to] = u;
+                    }
+                }
+            }
+            
+            for (int idx : reverse_adj[u]) {
+                int from = ReverseNameMapF[idx];
+                int to = ReverseNameMapS[idx];
+                if (parent[from] == -1 && graph[idx].flow > err) {
+                    q.push_front(from);
+                    parent[from] = to;
+                }
+            }
+        }
+        return false;
+    }
+
+    double totalBFS = 0;
 
     void Edmonds_Karp() {
         int source = sX;
@@ -511,7 +565,16 @@ class Graph {
         std::vector<int> parent(NameMap.size(), -1);
         parent[source] = source;
 
+        //bool bfstool  = true;
+
         while (bfs(parent, source, sink, G_rk)) {
+
+            /*clock_t z1 = clock();
+            bfstool = bfs(parent, source, sink, G_rk);
+            if(!bfstool) break;
+            clock_t z2 = clock();
+            totalBFS += (double)(z2-z1);*/
+
             bool found = false;
             double path_flow = std::numeric_limits<double>::max();
 
@@ -559,45 +622,6 @@ class Graph {
             int Ikey = iX + i;
             flow_val += G_rk[NameMap[Ikey][tX]].flow;
         }
-    }
-    
-
-    //Breadth First Search
-    inline bool bfs(std::vector<int>& parent, const int& source, const int& sink, const std::vector<edges_matrix>& graph) {
-        std::deque<int> q;
-        q.push_front(source);
-
-        std::fill(parent.begin()+1, parent.end(), -1);    //fill parent with -1 for all values.
-    
-        while (!q.empty()) {
-            int u = q.front();
-            q.pop_front();
-
-            for (const auto& [to, edgeIdx] : NameMap[u]) {
-                // `to` is the destination node name (e.g., "j0")
-                // `edgeIdx` is the unique index for edge (sX -> to)
-                if(graph[edgeIdx].capacity - graph[edgeIdx].flow > err){
-                    if (to == sink) {
-                        parent[to] = u;
-                        return true;
-                    }
-                    else if (parent[to] == -1) {
-                        q.push_front(to);   //using a stack instead of a queue, LIFO instead of FIFO, results in a +- 8% speedup
-                        parent[to] = u;
-                    }
-                }
-            }
-            
-            for (int idx : reverse_adj[u]) {
-                int from = ReverseNameMapF[idx];
-                int to = ReverseNameMapS[idx];
-                if (parent[from] == -1 && graph[idx].flow > err) {
-                    q.push_front(from);
-                    parent[from] = to;
-                }
-            }
-        }
-        return false;
     }
 
     void objective() {
@@ -658,6 +682,7 @@ class Graph {
 
     std::vector<edges_matrix> G, G_r, G_rk, f_matrix;
     std::vector<std::map<int, int>> NameMap;
+    std::vector<std::vector<NameMapHelp>> FastNameMap;
     std::vector<int> ReverseNameMapF, ReverseNameMapS;
     std::vector<std::vector<int>> reverse_adj;
 
