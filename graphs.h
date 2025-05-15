@@ -357,6 +357,7 @@ class Graph {
         }
         if (it <= 10) {
             objective();
+            std::cout << "help: " << help << "\n";
             /*printf("X) TOTAL EDMONDS KARP               %.5f seconds\n", EDMONDSKARPTIME / CLOCKS_PER_SEC); 
             printf("X) TOTAL BFS                        %.5f seconds\n", totalBFS / CLOCKS_PER_SEC);
             printf("X) TOTAL 1                          %.5f seconds\n", total1 / CLOCKS_PER_SEC);
@@ -445,8 +446,6 @@ class Graph {
     }
 }
 
-
-
     void reduce_network(std::vector<int> crit_r, std::vector<edges_matrix>& graph_rK) {
         for (int i : crit_r) {
             int Ikey = iX + i;
@@ -531,10 +530,7 @@ class Graph {
         EDMONDSKARPTIME += (double)(z2-z1);
     }
 
-    /*double total1 = 0;
-    double total2 = 0;
-    double total3 = 0;
-    double total4 = 0;*/
+    int help = 0;
 
     //Breadth First Search
     bool bfs(std::vector<int>& parent, const int& source, const int& sink, const std::vector<edges_matrix>& graph) {
@@ -549,9 +545,7 @@ class Graph {
             u = q.front();
             q.pop_front();
 
-            //clock_t q1 = clock();
             for (const auto& [to, edgeIdx] : FastNameMap[u]) {
-                //clock_t z1 = clock();
                 a = graph[edgeIdx];
                 // `to` is the destination node name (e.g., "j0")
                 // `edgeIdx` is the unique index for edge (sX -> to)
@@ -566,35 +560,94 @@ class Graph {
                         parent[to] = u;
                     }
                 }
-                //clock_t z2 = clock();
-                //total1 += (double)(z2-z1);
             }
-            //clock_t q2 = clock();
             for (int idx : reverse_adj[u]) {
-                //clock_t z1 = clock();
+                help++;
                 int from = ReverseNameMapF[idx];
                 if (parent[from] == -1 && graph[idx].flow > err) {
                     q.push_front(from);
                     parent[from] = ReverseNameMapS[idx];
                 }
-                //clock_t z2 = clock();
-                //total2 += (double)(z2-z1);
             }
-            /*clock_t q3 = clock();
-            for (int idx : reverse_adj[u]) {
-                int from = ReverseNameMapF[idx];
-                int to = ReverseNameMapS[idx];
-            }
-
-            clock_t q4 = clock();
-            total2 += (double)(q4-q3);
-            total3 += (double)(q2-q1);
-            total4 += (double)(q3-q2);*/
         }
         return false;
     }
 
-    double totalBFS = 0;
+    bool bidirectional_bfs(std::vector<int>& parent, std::vector<int>& parent_rev, int& meet_node, const int& source, const int& sink, const std::vector<edges_matrix>& graph) {
+        static std::deque<int> q_fwd, q_bwd;
+        parent.assign(parent.size(), -1);
+        parent_rev.assign(parent_rev.size(), -1);
+
+        q_fwd.push_back(source);
+        parent[source] = source;
+
+        q_bwd.push_back(sink);
+        parent_rev[sink] = sink;
+
+        while (!q_fwd.empty() && !q_bwd.empty()) {
+            // Expand forward search
+            if (!q_fwd.empty()) {
+                int u = q_fwd.front();
+                q_fwd.pop_front();
+
+                for (const auto& [to, edgeIdx] : FastNameMap[u]) {
+                    const edges_matrix& a = graph[edgeIdx];
+                    if (a.capacity - a.flow > err && parent[to] == -1) {
+                        parent[to] = u;
+                        q_fwd.push_back(to);
+                        if (parent_rev[to] != -1) {
+                            meet_node = to;
+                            return true;
+                        }
+                    }
+                }
+                for (int idx : reverse_adj[u]) {
+                    int from = ReverseNameMapF[idx];
+                    if (parent[from] == -1 && graph[idx].flow > err) {
+                        parent[from] = ReverseNameMapS[idx];
+                        q_fwd.push_back(from);
+                        if (parent_rev[from] != -1) {
+                            meet_node = from;
+                            return true;
+                        }
+                    }
+                }
+            }
+
+            // Expand backward search
+            if (!q_bwd.empty()) {
+                int v = q_bwd.front();
+                q_bwd.pop_front();
+
+                for (const auto& [to, edgeIdx] : FastNameMap[v]) {
+                    const edges_matrix& a = graph[edgeIdx];
+                    if (graph[edgeIdx].flow > err) {  // Reverse in backward search
+                        if (parent_rev[to] == -1) {
+                            parent_rev[to] = v;
+                            q_bwd.push_back(to);
+                            if (parent[to] != -1) {
+                                meet_node = to;
+                                return true;
+                            }
+                        }
+                    }
+                }
+                for (int idx : reverse_adj[v]) {
+                    int from = ReverseNameMapF[idx];
+                    if (graph[idx].capacity - graph[idx].flow > err && parent_rev[from] == -1) {
+                        parent_rev[from] = ReverseNameMapS[idx];
+                        q_bwd.push_back(from);
+                        if (parent[from] != -1) {
+                            meet_node = from;
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
 
     void Edmonds_Karp() {
         const int source = sX;
@@ -661,6 +714,100 @@ class Graph {
             flow_val += G_rk[NameMap[Ikey][tX]].flow;
         }
     }
+
+    void Edmonds_Karp_Bidirectional() {
+    const int source = sX;
+    const int sink = tX;
+    flow_val = 0;
+
+    std::vector<int> parent(NameMap.size(), -1);
+    std::vector<int> parent_rev(NameMap.size(), -1);
+    int meet_node = -1;
+
+    while (bidirectional_bfs(parent, parent_rev, meet_node, source, sink, G_rk)) {
+        double path_flow = std::numeric_limits<double>::max();
+        bool found = false;
+
+        // Reconstruct forward path: source -> meet_node
+        for (int v = meet_node; v != source; v = parent[v]) {
+            bool Reverse = false;
+            int idx = NameMap[parent[v]][v];
+            if (idx == 0) {
+                Reverse = true;
+                idx = NameMap[v][parent[v]];
+            }
+            const edges_matrix& x = G_rk[idx];
+
+            if (!Reverse) {
+                if (x.capacity - x.flow > err) {
+                    path_flow = std::min(path_flow, x.capacity - x.flow);
+                    found = true;
+                }
+            } else {
+                if (x.flow > err) {
+                    path_flow = std::min(path_flow, x.flow);
+                    found = true;
+                }
+            }
+        }
+
+        // Reconstruct backward path: meet_node -> sink (via parent_rev)
+        for (int v = meet_node; v != sink; v = parent_rev[v]) {
+            int u = parent_rev[v];
+            bool Reverse = false;
+            int idx = NameMap[v][u];
+            if (idx == 0) {
+                Reverse = true;
+                idx = NameMap[u][v];
+            }
+            const edges_matrix& x = G_rk[idx];
+
+            if (!Reverse) {
+                if (x.flow > err) {
+                    path_flow = std::min(path_flow, x.flow);
+                    found = true;
+                }
+            } else {
+                if (x.capacity - x.flow > err) {
+                    path_flow = std::min(path_flow, x.capacity - x.flow);
+                    found = true;
+                }
+            }
+        }
+
+        if (!found) break;
+
+        // Update forward path
+        for (int v = meet_node; v != source; v = parent[v]) {
+            int u = parent[v];
+            int idx = NameMap[u][v];
+            if (G_rk[idx].capacity - G_rk[idx].flow > err) {
+                G_rk[idx].flow += path_flow;
+            } else {
+                idx = NameMap[v][u];
+                G_rk[idx].flow -= path_flow;
+            }
+        }
+
+        // Update backward path
+        for (int v = meet_node; v != sink; v = parent_rev[v]) {
+            int u = parent_rev[v];
+            int idx = NameMap[v][u];
+            if (G_rk[idx].capacity - G_rk[idx].flow > err) {
+                G_rk[idx].flow += path_flow;
+            } else {
+                idx = NameMap[u][v];
+                G_rk[idx].flow -= path_flow;
+            }
+        }
+    }
+
+    // Compute total flow from I_a nodes to sink
+    for (int i : I_a) {
+        int Ikey = iX + i;
+        flow_val += G_rk[NameMap[Ikey][tX]].flow;
+    }
+}
 
     void objective() {
         int m = intervals_start.size();

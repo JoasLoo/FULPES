@@ -1,9 +1,6 @@
 @echo off
 
-g++ -O3 -pg -g -ffast-math -static-libstdc++ -funroll-loops -o main main.cpp
-main
-gprof main gmon.out > analysis.txt
-
+g++ -O3 -ffast-math -static-libstdc++ -gcflags "all=-m -m -d=ssa/check_bce/debug" -funroll-loops -o main main.cpp
 
 if %ERRORLEVEL% EQU 0 (
     echo Build successful!
