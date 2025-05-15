@@ -11,15 +11,11 @@
 #include <iostream>
 #include <unordered_map>
 #include <map>
-#include <variant>
 #include <cctype>
 #include <algorithm>
 #include <random>
 #include <set>
 #include <queue>
-#include <unordered_set>
-#include <functional>
-#include <iomanip>  // For std::setw and std::setprecision
 
 inline std::vector<double> sample_vector_C(const std::vector<double>& input, int N, bool randomSample) {
     std::vector<double> result;
@@ -359,8 +355,12 @@ class Graph {
         }
         if (it <= 10) {
             objective();
-            printf("X) TOTAL EDMONDS KARP               %.5f seconds\n", EDMONDSKARPTIME / CLOCKS_PER_SEC); 
+            /*printf("X) TOTAL EDMONDS KARP               %.5f seconds\n", EDMONDSKARPTIME / CLOCKS_PER_SEC); 
             printf("X) TOTAL BFS                        %.5f seconds\n", totalBFS / CLOCKS_PER_SEC);
+            printf("X) TOTAL 1                          %.5f seconds\n", total1 / CLOCKS_PER_SEC);
+            printf("X) TOTAL 2                          %.5f seconds\n", total2 / CLOCKS_PER_SEC);
+            printf("X) TOTAL 3                          %.5f seconds\n", total3 / CLOCKS_PER_SEC);
+            printf("X) TOTAL 4                          %.5f seconds\n", total4 / CLOCKS_PER_SEC);*/
         }
     }
 
@@ -515,9 +515,14 @@ class Graph {
         EDMONDSKARPTIME += (double)(z2-z1);
     }
 
+    /*double total1 = 0;
+    double total2 = 0;
+    double total3 = 0;
+    double total4 = 0;*/
+
     //Breadth First Search
     bool bfs(std::vector<int>& parent, const int& source, const int& sink, const std::vector<edges_matrix>& graph) {
-        std::deque<int> q;
+        static std::deque<int> q;
         q.push_front(source);
 
         std::fill(parent.begin()+1, parent.end(), -1);    //fill parent with -1 for all values.
@@ -528,13 +533,16 @@ class Graph {
             u = q.front();
             q.pop_front();
 
+            //clock_t q1 = clock();
             for (const auto& [to, edgeIdx] : FastNameMap[u]) {
+                //clock_t z1 = clock();
                 a = graph[edgeIdx];
                 // `to` is the destination node name (e.g., "j0")
                 // `edgeIdx` is the unique index for edge (sX -> to)
                 if(a.capacity - a.flow > err){
                     if (to == sink) {
                         parent[to] = u;
+                        q.clear();
                         return true;
                     }
                     else if (parent[to] == -1) {
@@ -542,16 +550,30 @@ class Graph {
                         parent[to] = u;
                     }
                 }
+                //clock_t z2 = clock();
+                //total1 += (double)(z2-z1);
             }
-            
+            //clock_t q2 = clock();
+            for (int idx : reverse_adj[u]) {
+                //clock_t z1 = clock();
+                int from = ReverseNameMapF[idx];
+                if (parent[from] == -1 && graph[idx].flow > err) {
+                    q.push_front(from);
+                    parent[from] = ReverseNameMapS[idx];
+                }
+                //clock_t z2 = clock();
+                //total2 += (double)(z2-z1);
+            }
+            /*clock_t q3 = clock();
             for (int idx : reverse_adj[u]) {
                 int from = ReverseNameMapF[idx];
                 int to = ReverseNameMapS[idx];
-                if (parent[from] == -1 && graph[idx].flow > err) {
-                    q.push_front(from);
-                    parent[from] = to;
-                }
             }
+
+            clock_t q4 = clock();
+            total2 += (double)(q4-q3);
+            total3 += (double)(q2-q1);
+            total4 += (double)(q3-q2);*/
         }
         return false;
     }
@@ -559,8 +581,8 @@ class Graph {
     double totalBFS = 0;
 
     void Edmonds_Karp() {
-        int source = sX;
-        int sink = tX;
+        const int source = sX;
+        const int sink = tX;
         flow_val = 0;
         std::vector<int> parent(NameMap.size(), -1);
         parent[source] = source;

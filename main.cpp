@@ -19,7 +19,7 @@ InstanceData opendata_toC(const string& filename);
 
 int main() {
     FILE *data; 
-    data = fopen("Data/DEMSdata_FOCS_v1.csv","r"); //open data file in C DEMSdata_FOCS_v1.csv ev_session_data_OR.csv
+    data = fopen("Data/ev_session_data_OR.csv","r"); //open data file in C DEMSdata_FOCS_v1.csv ev_session_data_OR.csv
     if(data == NULL) { //Check if data file opened succesfully
         printf("Cant open data.csv");
         exit(0);
