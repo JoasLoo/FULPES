@@ -240,6 +240,8 @@ class Graph {
 
 
         build_reverse_adj();
+        flatten_reverse_adj(reverse_adj);
+        flatten_FastNameMap(FastNameMap);
 
         G_r = G;
         total_demand_r = Get_M(G_r);  
@@ -686,6 +688,29 @@ class Graph {
             return M;
     }
 
+    void flatten_FastNameMap(const std::vector<std::vector<NameMapHelp>>& FastNameMap_nested) {
+        flat_FastNameMap.clear();
+        fast_offsets.clear();
+        fast_offsets.push_back(0);
+
+        for (const auto& row : FastNameMap_nested) {
+            flat_FastNameMap.insert(flat_FastNameMap.end(), row.begin(), row.end());
+            fast_offsets.push_back(flat_FastNameMap.size());
+        }
+    }
+
+    void flatten_reverse_adj(const std::vector<std::vector<int>>& reverse_adj_nested) {
+        flat_reverse_adj.clear();
+        reverse_offsets.clear();
+        reverse_offsets.push_back(0);
+
+        for (const auto& row : reverse_adj_nested) {
+            flat_reverse_adj.insert(flat_reverse_adj.end(), row.begin(), row.end());
+            reverse_offsets.push_back(flat_reverse_adj.size());
+        }
+    }
+
+
     int timeBase = 3600;
     std::vector<int> jobs;
 
@@ -704,9 +729,16 @@ class Graph {
 
     std::vector<edges_matrix> G, G_r, G_rk, f_matrix;
     std::vector<std::map<int, int>> NameMap;
-    std::vector<std::vector<NameMapHelp>> FastNameMap;
     std::vector<int> ReverseNameMapF, ReverseNameMapS;
+    std::vector<std::vector<NameMapHelp>> FastNameMap;
     std::vector<std::vector<int>> reverse_adj;
+
+    std::vector<NameMapHelp> flat_FastNameMap;
+    std::vector<size_t> fast_offsets;  // fast_offsets[u] = index into flat_FastNameMap
+
+    std::vector<int> flat_reverse_adj;
+    std::vector<size_t> reverse_offsets; // reverse_offsets[u] = index into flat_reverse_adj
+
 
     double EDMONDSKARPTIME = 0;
     int timestep;
