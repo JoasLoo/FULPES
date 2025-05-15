@@ -238,6 +238,9 @@ class Graph {
             G[NameMap[from][to]].capacity = capacity;
         }     
 
+        std::cout << "TimeComplexity is: O(" << std::max(pow(jobs.size(),4), pow(I_a.size(),4))  << ") \n";
+        std::cout << "TimeComplexity with Bi-directional BFS: O(" << std::max(pow(jobs.size(),2), pow(I_a.size(),2))  << ") \n";
+
 
         build_reverse_adj();
         flatten_reverse_adj(reverse_adj);
@@ -357,7 +360,6 @@ class Graph {
         }
         if (it <= 10) {
             objective();
-            std::cout << "help: " << help << "\n";
             /*printf("X) TOTAL EDMONDS KARP               %.5f seconds\n", EDMONDSKARPTIME / CLOCKS_PER_SEC); 
             printf("X) TOTAL BFS                        %.5f seconds\n", totalBFS / CLOCKS_PER_SEC);
             printf("X) TOTAL 1                          %.5f seconds\n", total1 / CLOCKS_PER_SEC);
@@ -530,15 +532,12 @@ class Graph {
         EDMONDSKARPTIME += (double)(z2-z1);
     }
 
-    int help = 0;
-
     //Breadth First Search
     bool bfs(std::vector<int>& parent, const int& source, const int& sink, const std::vector<edges_matrix>& graph) {
         static std::deque<int> q;
         q.push_front(source);
 
         std::fill(parent.begin()+1, parent.end(), -1);    //fill parent with -1 for all values.
-        edges_matrix a;
         int u = 0;
     
         while (!q.empty()) {
@@ -546,7 +545,7 @@ class Graph {
             q.pop_front();
 
             for (const auto& [to, edgeIdx] : FastNameMap[u]) {
-                a = graph[edgeIdx];
+                const edges_matrix& a = graph[edgeIdx];
                 // `to` is the destination node name (e.g., "j0")
                 // `edgeIdx` is the unique index for edge (sX -> to)
                 if(a.capacity - a.flow > err){
@@ -562,7 +561,6 @@ class Graph {
                 }
             }
             for (int idx : reverse_adj[u]) {
-                help++;
                 int from = ReverseNameMapF[idx];
                 if (parent[from] == -1 && graph[idx].flow > err) {
                     q.push_front(from);
