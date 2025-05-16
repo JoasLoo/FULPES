@@ -587,37 +587,40 @@ class Graph {
         q_fwd.push_front(source);
         parent[source] = source;
 
+        //ATOMIC BOOL NOT FOUND
+
         q_bwd.push_front(sink);
         parent_rev[sink] = sink;
         while (!q_fwd.empty() && !q_bwd.empty()) {
 
             // Expand forward search
-            if (!q_fwd.empty()) {
-                int u = q_fwd.front();
+            if (!q_fwd.empty()) {   //&&NOT FOUND
+                int u = q_fwd.front();  
                 q_fwd.pop_front();
 
                 for (const auto& [to, edgeIdx] : FastNameMap[u]) {
                     const edges_matrix& a = graph[edgeIdx];
-                    if (a.capacity - a.flow > err && parent[to] == -1) {
-                        parent[to] = u;
-                        q_fwd.push_back(to);
+                    if (a.capacity - a.flow > err && parent[to] == -1) {    //&&NOT FOUND
+                        parent[to] = u; //mtx lock
+                        q_fwd.push_back(to);    //mtx lock
+                                                //start new thread if pushed_back.??
                         if (parent_rev[to] != -1) {
                             meet_node = to;
-                            q_fwd.clear();
-                            q_bwd.clear();
-                            return true;
+                            q_fwd.clear();  //mtx lock
+                            q_bwd.clear();  //mtx lock
+                            return true;    
                         }
                     }
                 }
                 for (int idx : reverse_adj[u]) {
                     int from = ReverseNameMapF[idx];
-                    if (parent[from] == -1 && graph[idx].flow > err) {
-                        parent[from] = ReverseNameMapS[idx];
-                        q_fwd.push_back(from);
+                    if (parent[from] == -1 && graph[idx].flow > err) {  //&&NOT FOUND
+                        parent[from] = ReverseNameMapS[idx];    //mtx lock
+                        q_fwd.push_back(from);  //mtx lock
                         if (parent_rev[from] != -1) {
                             meet_node = from;
-                            q_fwd.clear();
-                            q_bwd.clear();
+                            q_fwd.clear();  //mtx lock
+                            q_bwd.clear();  //mtx lock
                             return true;
                         }
                     }
@@ -625,20 +628,20 @@ class Graph {
             }
 
             // Expand backward search
-            if (!q_bwd.empty()) {
+            if (!q_bwd.empty()) {   //&&NOT FOUND
                 int v = q_bwd.front();
                 q_bwd.pop_front();
 
                 for (int idx : reverse_adj[v]) {
                     int from = ReverseNameMapF[idx];
                     const edges_matrix& a = graph[idx];
-                    if (a.capacity - a.flow > err && parent_rev[from] == -1) {
-                        parent_rev[from] = ReverseNameMapS[idx];
-                        q_bwd.push_back(from);
+                    if (a.capacity - a.flow > err && parent_rev[from] == -1) {  //&&NOT FOUND
+                        parent_rev[from] = ReverseNameMapS[idx];    //mtx lock
+                        q_bwd.push_back(from);  //mtx lock
                         if (parent[from] != -1) {
                             meet_node = from;
-                            q_fwd.clear();
-                            q_bwd.clear();
+                            q_fwd.clear();  //mtx lock
+                            q_bwd.clear();  //mtx lock
                             return true;
                         }
                     }
@@ -647,13 +650,13 @@ class Graph {
                 if(v != sink) {
                     for (const auto& [to, edgeIdx] : FastNameMap[v]) {
                         //if(to != sink){
-                            if (graph[edgeIdx].flow > err && parent_rev[to] == -1) {  // Reverse in backward search
-                                parent_rev[to] = v;
-                                q_bwd.push_back(to);
+                            if (graph[edgeIdx].flow > err && parent_rev[to] == -1) {  // Reverse in backward search //&&NOT FOUND
+                                parent_rev[to] = v; //mtx lock
+                                q_bwd.push_back(to);    //mtx lock
                                 if (parent[to] != -1) {
                                     meet_node = to;
-                                    q_fwd.clear();
-                                    q_bwd.clear();
+                                    q_fwd.clear();  //mtx lock
+                                    q_bwd.clear();  //mtx lock
                                     return true;
                                 }
                             }
@@ -662,6 +665,8 @@ class Graph {
                 }
             }
         }
+        //THREADS JOIN()
+        //IF FOUND RETURN TRUE ELSE FALSE. 
         return false;
     }
 
