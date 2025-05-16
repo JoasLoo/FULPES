@@ -238,13 +238,11 @@ class Graph {
             G[NameMap[from][to]].capacity = capacity;
         }     
 
-        std::cout << "TimeComplexity is: O(" << std::max(pow(jobs.size(),4), pow(I_a.size(),4))  << ") \n";
-        std::cout << "TimeComplexity with Bi-directional BFS: O(" << std::max(pow(jobs.size(),2), pow(I_a.size(),2))  << ") \n";
+        //std::cout << "TimeComplexity is: O(" << std::max(pow(jobs.size(),4), pow(I_a.size(),4))  << ") \n";
+        //std::cout << "TimeComplexity with Bi-directional BFS: O(" << std::max(pow(jobs.size(),2), pow(I_a.size(),2))  << ") \n";
 
 
         build_reverse_adj();
-        flatten_reverse_adj(reverse_adj);
-        flatten_FastNameMap(FastNameMap);
 
         G_r = G;
         total_demand_r = Get_M(G_r);  
@@ -519,17 +517,16 @@ class Graph {
                 int Ikey = iX + i;
                 G_rk[NameMap[Ikey][tX]].capacity = demand_normalized * len_i[i];
             }
-
-            //std::cout << "Demand: " << demand << " length_sum_intervals(I_a, len_i) " << length_sum_intervals(I_a, len_i) << "\n";
         }
     }
     
     void Max_flow_solver() {
         clock_t z1 = clock();
         reset_flows(G_rk);   // Reset all flows to 0 for a DFS effect
-        Edmonds_Karp();
+        Edmonds_Karp_Bidirectional();
+
         clock_t z2 = clock();
-        EDMONDSKARPTIME += (double)(z2-z1);
+        //EDMONDSKARPTIME += (double)(z2-z1);
     }
 
     //Breadth First Search
@@ -539,7 +536,6 @@ class Graph {
 
         std::fill(parent.begin()+1, parent.end(), -1);    //fill parent with -1 for all values.
         int u = 0;
-    
         while (!q.empty()) {
             u = q.front();
             q.pop_front();
@@ -555,7 +551,7 @@ class Graph {
                         return true;
                     }
                     else if (parent[to] == -1) {
-                        q.push_front(to);   //using a stack instead of a queue, LIFO instead of FIFO, results in a +- 8% speedup
+                        q.push_back(to);   //using a stack instead of a queue, LIFO instead of FIFO, results in a +- 8% speedup
                         parent[to] = u;
                     }
                 }
@@ -563,7 +559,7 @@ class Graph {
             for (int idx : reverse_adj[u]) {
                 int from = ReverseNameMapF[idx];
                 if (parent[from] == -1 && graph[idx].flow > err) {
-                    q.push_front(from);
+                    q.push_back(from);
                     parent[from] = ReverseNameMapS[idx];
                 }
             }
@@ -576,13 +572,13 @@ class Graph {
         parent.assign(parent.size(), -1);
         parent_rev.assign(parent_rev.size(), -1);
 
-        q_fwd.push_back(source);
+        q_fwd.push_front(source);
         parent[source] = source;
 
-        q_bwd.push_back(sink);
+        q_bwd.push_front(sink);
         parent_rev[sink] = sink;
-
         while (!q_fwd.empty() && !q_bwd.empty()) {
+
             // Expand forward search
             if (!q_fwd.empty()) {
                 int u = q_fwd.front();
@@ -590,13 +586,17 @@ class Graph {
 
                 for (const auto& [to, edgeIdx] : FastNameMap[u]) {
                     const edges_matrix& a = graph[edgeIdx];
-                    if (a.capacity - a.flow > err && parent[to] == -1) {
+                    if (a.capacity - a.flow > err) {
+                    if (parent[to] == -1) {
                         parent[to] = u;
                         q_fwd.push_back(to);
                         if (parent_rev[to] != -1) {
                             meet_node = to;
+                            q_fwd.clear();
+                            q_bwd.clear();
                             return true;
                         }
+                    }
                     }
                 }
                 for (int idx : reverse_adj[u]) {
@@ -606,6 +606,8 @@ class Graph {
                         q_fwd.push_back(from);
                         if (parent_rev[from] != -1) {
                             meet_node = from;
+                            q_fwd.clear();
+                            q_bwd.clear();
                             return true;
                         }
                     }
@@ -617,19 +619,6 @@ class Graph {
                 int v = q_bwd.front();
                 q_bwd.pop_front();
 
-                for (const auto& [to, edgeIdx] : FastNameMap[v]) {
-                    const edges_matrix& a = graph[edgeIdx];
-                    if (graph[edgeIdx].flow > err) {  // Reverse in backward search
-                        if (parent_rev[to] == -1) {
-                            parent_rev[to] = v;
-                            q_bwd.push_back(to);
-                            if (parent[to] != -1) {
-                                meet_node = to;
-                                return true;
-                            }
-                        }
-                    }
-                }
                 for (int idx : reverse_adj[v]) {
                     int from = ReverseNameMapF[idx];
                     if (graph[idx].capacity - graph[idx].flow > err && parent_rev[from] == -1) {
@@ -637,15 +626,36 @@ class Graph {
                         q_bwd.push_back(from);
                         if (parent[from] != -1) {
                             meet_node = from;
+                            q_fwd.clear();
+                            q_bwd.clear();
                             return true;
                         }
                     }
                 }
+
+                if(v != sink) {
+                    for (const auto& [to, edgeIdx] : FastNameMap[v]) {
+                        //if(to != sink){
+                            const edges_matrix& a = graph[edgeIdx];
+                            if (graph[edgeIdx].flow > err && parent_rev[to] == -1) {  // Reverse in backward search
+                                parent_rev[to] = v;
+                                q_bwd.push_back(to);
+                                if (parent[to] != -1) {
+                                    meet_node = to;
+                                    q_fwd.clear();
+                                    q_bwd.clear();
+                                    return true;
+                                }
+                            }
+                        //}
+                    }
+                }
             }
         }
-
         return false;
     }
+
+    int counter = 0;
 
     void Edmonds_Karp() {
         const int source = sX;
@@ -657,6 +667,7 @@ class Graph {
         //bool bfstool  = true;
 
         while (bfs(parent, source, sink, G_rk)) {
+            counter++;
 
             /*clock_t z1 = clock();
             bfstool = bfs(parent, source, sink, G_rk);
@@ -748,7 +759,7 @@ class Graph {
                 }
             }
         }
-
+        
         // Reconstruct backward path: meet_node -> sink (via parent_rev)
         for (int v = meet_node; v != sink; v = parent_rev[v]) {
             int u = parent_rev[v];
@@ -761,31 +772,20 @@ class Graph {
             const edges_matrix& x = G_rk[idx];
 
             if (!Reverse) {
-                if (x.flow > err) {
-                    path_flow = std::min(path_flow, x.flow);
-                    found = true;
-                }
-            } else {
                 if (x.capacity - x.flow > err) {
                     path_flow = std::min(path_flow, x.capacity - x.flow);
                     found = true;
                 }
+            } else {
+                if (x.flow > err) {
+                    path_flow = std::min(path_flow, x.flow);
+                    found = true;
+                }
             }
         }
+        
 
         if (!found) break;
-
-        // Update forward path
-        for (int v = meet_node; v != source; v = parent[v]) {
-            int u = parent[v];
-            int idx = NameMap[u][v];
-            if (G_rk[idx].capacity - G_rk[idx].flow > err) {
-                G_rk[idx].flow += path_flow;
-            } else {
-                idx = NameMap[v][u];
-                G_rk[idx].flow -= path_flow;
-            }
-        }
 
         // Update backward path
         for (int v = meet_node; v != sink; v = parent_rev[v]) {
@@ -798,8 +798,20 @@ class Graph {
                 G_rk[idx].flow -= path_flow;
             }
         }
-    }
 
+        // Update forward path
+        for (int v = meet_node; v != source; v = parent[v]) {
+            int u = parent[v];
+            int idx = NameMap[u][v];
+            if (G_rk[idx].capacity - G_rk[idx].flow > err) {
+                G_rk[idx].flow += path_flow;
+            } else {
+                idx = NameMap[v][u];
+                G_rk[idx].flow -= path_flow;
+            }
+        }
+    }
+    
     // Compute total flow from I_a nodes to sink
     for (int i : I_a) {
         int Ikey = iX + i;
@@ -847,29 +859,6 @@ class Graph {
             return M;
     }
 
-    void flatten_FastNameMap(const std::vector<std::vector<NameMapHelp>>& FastNameMap_nested) {
-        flat_FastNameMap.clear();
-        fast_offsets.clear();
-        fast_offsets.push_back(0);
-
-        for (const auto& row : FastNameMap_nested) {
-            flat_FastNameMap.insert(flat_FastNameMap.end(), row.begin(), row.end());
-            fast_offsets.push_back(flat_FastNameMap.size());
-        }
-    }
-
-    void flatten_reverse_adj(const std::vector<std::vector<int>>& reverse_adj_nested) {
-        flat_reverse_adj.clear();
-        reverse_offsets.clear();
-        reverse_offsets.push_back(0);
-
-        for (const auto& row : reverse_adj_nested) {
-            flat_reverse_adj.insert(flat_reverse_adj.end(), row.begin(), row.end());
-            reverse_offsets.push_back(flat_reverse_adj.size());
-        }
-    }
-
-
     int timeBase = 3600;
     std::vector<int> jobs;
 
@@ -891,12 +880,6 @@ class Graph {
     std::vector<int> ReverseNameMapF, ReverseNameMapS;
     std::vector<std::vector<NameMapHelp>> FastNameMap;
     std::vector<std::vector<int>> reverse_adj;
-
-    std::vector<NameMapHelp> flat_FastNameMap;
-    std::vector<size_t> fast_offsets;  // fast_offsets[u] = index into flat_FastNameMap
-
-    std::vector<int> flat_reverse_adj;
-    std::vector<size_t> reverse_offsets; // reverse_offsets[u] = index into flat_reverse_adj
 
 
     double EDMONDSKARPTIME = 0;
