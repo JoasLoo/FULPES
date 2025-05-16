@@ -7,10 +7,10 @@
 using namespace std;
 
 
-const int instanceSize = 200; //number of EVs/jobs in instance
+const int instanceSize = 400; //number of EVs/jobs in instance
 int timeStep = 900; //quarterly granularity
 
-bool randomSample = false;
+bool randomSample = true;
 
 vector<int> FOCS_breakpoints;
 
@@ -18,14 +18,8 @@ InstanceData opendata_toC(const string& filename);
 
 
 int main() {
-    FILE *data; 
-    data = fopen("Data/ev_session_data_OR.csv","r"); //open data file in C DEMSdata_FOCS_v1.csv ev_session_data_OR.csv
-    if(data == NULL) { //Check if data file opened succesfully
-        printf("Cant open data.csv");
-        exit(0);
-    }  
     clock_t t1 = clock();
-    InstanceData instance1 = opendata_toC("Data/DEMSdata_FOCS_v1.csv");
+    InstanceData instance1 = opendata_toC("Data/DEMSdata_FOCS_v1.csv"); //open data file in C++ DEMSdata_FOCS_v1.csv ev_session_data_OR.csv
     clock_t q1 = clock();
 
     Graph g;
@@ -38,13 +32,13 @@ int main() {
     
     clock_t qx = clock();
 
+    g.objective();
 
     printf("X) LOADING C DATA            %.5f seconds\n", (double)(q1 - t1) / CLOCKS_PER_SEC);
     printf("X) INIT C GRAPH            %.5f seconds\n", (double)(q2 - q1) / CLOCKS_PER_SEC);
     printf("X) INIT C FOCS            %.5f seconds\n", (double)(q3 - q2) / CLOCKS_PER_SEC);
     printf("X) SOLVE C FOCS            %.5f seconds\n", (double)(qx - q3) / CLOCKS_PER_SEC);
 
-    fclose(data);
     return 0;
 }
 

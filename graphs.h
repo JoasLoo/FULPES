@@ -103,7 +103,6 @@ class Graph {
         std::vector<double> average_power_W;
         std::vector<double> t0_x;
         std::vector<double> t1_x;
-        std::vector<double> total_energy;
         std::vector<double> total_energy_Wh;
         std::vector<double> maxPower;
 
@@ -119,7 +118,6 @@ class Graph {
         //init all
 
         average_power_W = sample_vector_C(instance.get_double_array("average_power_W"), instancesize, randomize);
-        total_energy = sample_vector_C(instance.get_double_array("total_energy"), instancesize, randomize);
         total_energy_Wh = sample_vector_C(instance.get_double_array("total_energy_Wh"), instancesize, randomize);
         maxPower = sample_vector_C(instance.get_double_array("maxPower"), instancesize, randomize);
 
@@ -250,6 +248,7 @@ class Graph {
         it = 0;
     }
 
+    double totalEDMONDKARP = 0;
     void solve_focs() {
         reset_caps(f_matrix);
         reset_flows(f_matrix);
@@ -259,7 +258,10 @@ class Graph {
             }
             update_network_capacities_g();
             //Edmonds_Karp();
+            clock_t z1 = clock();
             Max_flow_solver();
+            clock_t z2 = clock();
+            totalEDMONDKARP += (double)(z2-z1);
             MaxDiff = Get_M(G_rk) - flow_val; 
             
             if (total_demand_r-flow_val < err) {
@@ -356,16 +358,26 @@ class Graph {
                 selfterminate = true;
             }
         }
-        if (it <= 10) {
-            objective();
-            /*printf("X) TOTAL EDMONDS KARP               %.5f seconds\n", EDMONDSKARPTIME / CLOCKS_PER_SEC); 
-            printf("X) TOTAL BFS                        %.5f seconds\n", totalBFS / CLOCKS_PER_SEC);
-            printf("X) TOTAL 1                          %.5f seconds\n", total1 / CLOCKS_PER_SEC);
-            printf("X) TOTAL 2                          %.5f seconds\n", total2 / CLOCKS_PER_SEC);
-            printf("X) TOTAL 3                          %.5f seconds\n", total3 / CLOCKS_PER_SEC);
-            printf("X) TOTAL 4                          %.5f seconds\n", total4 / CLOCKS_PER_SEC);*/
-        }
     }
+
+    void objective() {
+        int m = intervals_start.size();
+        std::vector<double> p_i(m);
+        for (int i = 0; i < m; i++) {
+            int Ikey = iX + i;
+            double flow = f_matrix[NameMap[Ikey][tX]].flow;
+            p_i[i] = (flow / len_i[i]) * timeBase;
+        }
+        std::vector<double> powerSquare(m);
+        for (int i = 0; i < m; ++i) {
+            powerSquare[i] = (p_i[i] * p_i[i]) * (len_i[i] / timestep);
+        }
+
+        objNormalized = std::accumulate(powerSquare.begin(), powerSquare.end(), 0.0);
+        std::cout << "Objective value C++ = " << objNormalized << "\n";
+        //return objNormalized;
+    }
+
 
     private: 
 
@@ -586,8 +598,7 @@ class Graph {
 
                 for (const auto& [to, edgeIdx] : FastNameMap[u]) {
                     const edges_matrix& a = graph[edgeIdx];
-                    if (a.capacity - a.flow > err) {
-                    if (parent[to] == -1) {
+                    if (a.capacity - a.flow > err && parent[to] == -1) {
                         parent[to] = u;
                         q_fwd.push_back(to);
                         if (parent_rev[to] != -1) {
@@ -596,7 +607,6 @@ class Graph {
                             q_bwd.clear();
                             return true;
                         }
-                    }
                     }
                 }
                 for (int idx : reverse_adj[u]) {
@@ -621,7 +631,8 @@ class Graph {
 
                 for (int idx : reverse_adj[v]) {
                     int from = ReverseNameMapF[idx];
-                    if (graph[idx].capacity - graph[idx].flow > err && parent_rev[from] == -1) {
+                    const edges_matrix& a = graph[idx];
+                    if (a.capacity - a.flow > err && parent_rev[from] == -1) {
                         parent_rev[from] = ReverseNameMapS[idx];
                         q_bwd.push_back(from);
                         if (parent[from] != -1) {
@@ -636,7 +647,6 @@ class Graph {
                 if(v != sink) {
                     for (const auto& [to, edgeIdx] : FastNameMap[v]) {
                         //if(to != sink){
-                            const edges_matrix& a = graph[edgeIdx];
                             if (graph[edgeIdx].flow > err && parent_rev[to] == -1) {  // Reverse in backward search
                                 parent_rev[to] = v;
                                 q_bwd.push_back(to);
@@ -655,8 +665,6 @@ class Graph {
         return false;
     }
 
-    int counter = 0;
-
     void Edmonds_Karp() {
         const int source = sX;
         const int sink = tX;
@@ -667,7 +675,6 @@ class Graph {
         //bool bfstool  = true;
 
         while (bfs(parent, source, sink, G_rk)) {
-            counter++;
 
             /*clock_t z1 = clock();
             bfstool = bfs(parent, source, sink, G_rk);
@@ -724,6 +731,8 @@ class Graph {
         }
     }
 
+    double totalBFS = 0;
+
     void Edmonds_Karp_Bidirectional() {
     const int source = sX;
     const int sink = tX;
@@ -733,9 +742,17 @@ class Graph {
     std::vector<int> parent_rev(NameMap.size(), -1);
     int meet_node = -1;
 
+    //bool bfstool = true;
+
     while (bidirectional_bfs(parent, parent_rev, meet_node, source, sink, G_rk)) {
         double path_flow = std::numeric_limits<double>::max();
         bool found = false;
+
+        /*clock_t z1 = clock(); 
+        bfstool = bidirectional_bfs(parent, parent_rev, meet_node, source, sink, G_rk);
+        clock_t z2 = clock(); 
+        totalBFS += (double)(z2-z1);
+        if(!bfstool) break;*/
 
         // Reconstruct forward path: source -> meet_node
         for (int v = meet_node; v != source; v = parent[v]) {
@@ -818,25 +835,7 @@ class Graph {
         flow_val += G_rk[NameMap[Ikey][tX]].flow;
     }
 }
-
-    void objective() {
-        int m = intervals_start.size();
-        std::vector<double> p_i(m);
-        for (int i = 0; i < m; i++) {
-            int Ikey = iX + i;
-            double flow = f_matrix[NameMap[Ikey][tX]].flow;
-            p_i[i] = (flow / len_i[i]) * timeBase;
-        }
-        std::vector<double> powerSquare(m);
-        for (int i = 0; i < m; ++i) {
-            powerSquare[i] = (p_i[i] * p_i[i]) * (len_i[i] / timestep);
-        }
-
-        objNormalized = std::accumulate(powerSquare.begin(), powerSquare.end(), 0.0);
-        std::cout << "Objective value C++ = " << objNormalized << "\n";
-        //return objNormalized;
-    }
-
+    
     inline double length_sum_intervals(const std::vector<int>& I_list, const std::vector<int>& L_list) {
         double sum = 0.0;  // Initialize sum to 0
         for (int i : I_list) {  // Loop over each index in I_list
