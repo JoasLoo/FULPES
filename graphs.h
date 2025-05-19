@@ -681,7 +681,6 @@ class Graph {
     std::mutex mtx_q_fwd;
     std::mutex mtx_q_bwd;
 
-
     bool bidirectional_bfs_threaded(std::vector<int>& parent, std::vector<int>& parent_rev, int& meet_node, const int& source, const int& sink, const std::vector<edges_matrix>& graph) {
         static std::deque<int> q_fwd, q_bwd;
         parent.assign(parent.size(), -1);
@@ -695,8 +694,8 @@ class Graph {
         MeetnodeAtomic.store(-1);
         FoundMeet.store(false);
         while (!q_fwd.empty() && !q_bwd.empty() && !FoundMeet.load()) {
-            std::thread t1(forward_search, parent, parent_rev, q_fwd, q_bwd, graph);
-            std::thread t2(backward_search, parent, parent_rev, q_fwd, q_bwd, sink, graph);
+            std::thread t1(&Graph::forward_search, this, std::ref(parent), std::ref(parent_rev), std::ref(q_fwd), std::ref(q_bwd), std::ref(graph));
+            std::thread t2(&Graph::backward_search, this, std::ref(parent), std::ref(parent_rev), std::ref(q_fwd), std::ref(q_bwd), std::ref(sink), std::ref(graph));
 
             t1.join();
             t2.join();
