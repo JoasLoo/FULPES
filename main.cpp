@@ -7,7 +7,7 @@
 using namespace std;
 
 
-const int instanceSize = 200; //number of EVs/jobs in instance
+const int instanceSize = 5; //number of EVs/jobs in instance
 int timeStep = 900; //quarterly granularity
 
 bool randomSample = true;
