@@ -10,7 +10,7 @@ using namespace std;
 const int instanceSize = 200; //number of EVs/jobs in instance
 int timeStep = 900; //quarterly granularity
 
-bool randomSample = true;
+bool randomSample = false;
 
 vector<int> FOCS_breakpoints;
 
@@ -20,6 +20,7 @@ InstanceData opendata_toC(const string& filename);
 int main() {
     clock_t t1 = clock();
     InstanceData instance1 = opendata_toC("Data/DEMSdata_FOCS_v1.csv"); //open data file in C++ DEMSdata_FOCS_v1.csv ev_session_data_OR.csv
+        //ev_session_data_OR.csv breaks if randomsample, or instancesize = 399 / 200
     clock_t q1 = clock();
 
     Graph g;

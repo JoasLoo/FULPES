@@ -16,9 +16,11 @@
 #include <random>
 #include <set>
 #include <queue>
-/*#include <thread>
+#include <thread>
 #include <atomic>
-#include <mutex>*/
+#include <mutex>
+#include <omp.h>
+
 
 inline std::vector<double> sample_vector_C(const std::vector<double>& input, int N, bool randomSample) {
     std::vector<double> result;
@@ -162,6 +164,7 @@ class Graph {
 
         iX = jobs.size() + 1;
         tX = iX + I_a.size();
+        
         NameMap.resize(tX);
         FastNameMap.resize(tX);
 
@@ -205,7 +208,8 @@ class Graph {
             edgeIndex++;
         }
 
-
+        FastNameMap_perm.reserve(FastNameMap.size());
+        FastNameMap_perm = FastNameMap;
         //dedicate enough space to all matrices.
         G = std::vector<edges_matrix>(edgeIndex);
         G_rk = G;
@@ -244,6 +248,8 @@ class Graph {
 
 
         build_reverse_adj();
+        reverse_adj_perm.reserve(reverse_adj.size());
+        reverse_adj_perm = reverse_adj;
 
         G_r = G;
         total_demand_r = Get_M(G_r);  
@@ -258,6 +264,8 @@ class Graph {
         while (!selfterminate) {
             if(it == 0) {
                 G_rk = G_r;
+                reverse_adj = reverse_adj_perm;
+                FastNameMap = FastNameMap_perm;
             }
             update_network_capacities_g();
             //Edmonds_Karp();
@@ -360,7 +368,9 @@ class Graph {
             if (it > 10) {
                 selfterminate = true;
             }
+            
         }
+        printf("X) %.5f\n", totalEDMONDKARP / CLOCKS_PER_SEC);
     }
 
     void objective() {
@@ -479,9 +489,29 @@ class Graph {
                 if(AddingF) {  // if F is initiated in another round, add the flows to F.
                     f_matrix[j].flow += graph_rK[j].flow;
                 }
+                
                 graph_rK[j].capacity = 0;
                 graph_rK[j].flow = 0;
             }
+
+            //Decrease FastNameMap reverse_adj For faster execution time.
+            FastNameMap[Ikey].clear();      //from Ikey to X
+            reverse_adj[Ikey].clear();      //from X to Ikey
+            for (auto& vec : FastNameMap)   {         // walk through every adjacency list
+                for (int i = 0; i < vec.size(); i++) {
+                    if(vec[i].to == Ikey) {
+                        vec.erase(vec.begin()+i);
+                    }
+                } 
+            }
+            for (auto& vec : reverse_adj) {
+                for(int i = 0; i < vec.size(); i++) {
+                    if(vec[i] == Ikey) {
+                        vec.erase(vec.begin()+i);
+                    }
+                }
+            }
+                
         }
     }
 
@@ -673,15 +703,16 @@ class Graph {
         return false;
     }
 
-    //std::atomic<bool> FoundMeet = false;
-    //std::atomic<int> MeetnodeAtomic;
-    /*bool FoundMeet = false;
-    int MeetnodeAtomic = -1;
+    std::atomic<bool> FoundMeet = false;
+    std::atomic<int> MeetnodeAtomic;
+    std::atomic<bool> DoneExecuting = true;
 
-    std::mutex mtx_parent;
-    std::mutex mtx_parent_rev;
-    std::mutex mtx_q_fwd;
-    std::mutex mtx_q_bwd;
+    std::thread t1, t2;
+
+    //std::mutex mtx_parent;
+    //std::mutex mtx_parent_rev;
+    //std::mutex mtx_q_fwd;
+    //std::mutex mtx_q_bwd;
 
     bool bidirectional_bfs_threaded(std::vector<int>& parent, std::vector<int>& parent_rev, int& meet_node, const int& source, const int& sink, const std::vector<edges_matrix>& graph) {
         std::deque<int> q_fwd, q_bwd;
@@ -693,8 +724,18 @@ class Graph {
 
         q_bwd.push_front(sink);
         parent_rev[sink] = sink;
+
+        if(DoneExecuting) {
+            DoneExecuting = false;
+            t1 = std::thread(&Graph::forward_search, this, std::ref(parent), std::ref(parent_rev), std::ref(q_fwd), std::ref(q_bwd), std::ref(graph));
+            t2 = std::thread(&Graph::backward_search, this, std::ref(parent), std::ref(parent_rev), std::ref(q_fwd), std::ref(q_bwd), std::ref(sink), std::ref(graph));
+        }
+        
+
         //MeetnodeAtomic.store(-1);
         //FoundMeet.store(false);
+        FoundMeet = false;
+        MeetnodeAtomic = -1;
         bool found = FoundMeet; //FoundMeet.load();
         while (!q_fwd.empty() && !q_bwd.empty() && !found) {
             forward_search(parent, parent_rev, q_fwd, q_bwd, graph);
@@ -708,73 +749,80 @@ class Graph {
         }
         if (found) {
             meet_node = MeetnodeAtomic; //MeetnodeAtomic.load();
-            std::cout << "Path found, meet node: " << meet_node << "\n";
             return true;
         } else {
-            std::cout << "No path found!\n";
             return false;
         }   
     }
 
     void forward_search(std::vector<int>& parent, std::vector<int>& parent_rev, std::deque<int>& q_fwd, std::deque<int>& q_bwd, const std::vector<edges_matrix>& graph) {
-        if (!q_fwd.empty()) {   //&&NOT FOUND
+        while (!DoneExecuting) {
+        if (!q_fwd.empty() && !FoundMeet) {   //&&NOT FOUND
                 int u = q_fwd.front();  
                 q_fwd.pop_front();
 
                 for (const auto& [to, edgeIdx] : FastNameMap[u]) {
-                    const edges_matrix& a = graph[edgeIdx];
-                    if (a.capacity - a.flow > err && parent[to] == -1) {    //&&NOT FOUND
-                        parent[to] = u; //mtx lock
-                        q_fwd.push_back(to);    //mtx lock
-                                                //start new thread if pushed_back.??
-                        if (parent_rev[to] != -1) {
-                            q_fwd.clear();  //mtx lock
-                            q_bwd.clear();  //mtx lock
-                            MeetnodeAtomic = to; //MeetnodeAtomic.store(to);    
-                            FoundMeet = true; //FoundMeet.store(true); 
+                    if(!FoundMeet) {
+                        const edges_matrix& a = graph[edgeIdx];
+                        if (a.capacity - a.flow > err && parent[to] == -1) {    //&&NOT FOUND
+                            parent[to] = u; //mtx lock
+                            q_fwd.push_back(to);    //mtx lock
+                                                    //start new thread if pushed_back.??
+                            if (parent_rev[to] != -1) {
+                                q_fwd.clear();  //mtx lock
+                                q_bwd.clear();  //mtx lock
+                                MeetnodeAtomic = to; //MeetnodeAtomic.store(to);    
+                                FoundMeet = true; //FoundMeet.store(true); 
+                            }
                         }
                     }
                 }
                 for (int idx : reverse_adj[u]) {
-                    int from = ReverseNameMapF[idx];
-                    if (parent[from] == -1 && graph[idx].flow > err) {  //&&NOT FOUND
-                        parent[from] = ReverseNameMapS[idx];    //mtx lock
-                        q_fwd.push_back(from);  //mtx lock
-                        if (parent_rev[from] != -1) {
-                            q_fwd.clear();  //mtx lock
-                            q_bwd.clear();  //mtx lock
-                            MeetnodeAtomic = from; //MeetnodeAtomic.store(from);    
-                            FoundMeet = true; //FoundMeet.store(true); 
+                    if(!FoundMeet) {
+                        int from = ReverseNameMapF[idx];
+                        if (parent[from] == -1 && graph[idx].flow > err) {  //&&NOT FOUND
+                            parent[from] = ReverseNameMapS[idx];    //mtx lock
+                            q_fwd.push_back(from);  //mtx lock
+                            if (parent_rev[from] != -1) {
+                                q_fwd.clear();  //mtx lock
+                                q_bwd.clear();  //mtx lock
+                                MeetnodeAtomic = from; //MeetnodeAtomic.store(from);    
+                                FoundMeet = true; //FoundMeet.store(true); 
+                            }
                         }
                     }
                 }
             }
+        }
     }
 
     void backward_search(std::vector<int>& parent, std::vector<int>& parent_rev, std::deque<int>& q_fwd, std::deque<int>& q_bwd, const int& sink, const std::vector<edges_matrix>& graph) {
         // Expand backward search
-        if(!q_bwd.empty()) {
+        while(!DoneExecuting) {
+        if(!q_bwd.empty()&& !FoundMeet) {
                 int v = q_bwd.front();
                 q_bwd.pop_front();
-
                 for (int idx : reverse_adj[v]) {
-                    int from = ReverseNameMapF[idx];
-                    const edges_matrix& a = graph[idx];
-                    if (a.capacity - a.flow > err && parent_rev[from] == -1) {  //&&NOT FOUND
-                        parent_rev[from] = ReverseNameMapS[idx];    //mtx lock
-                        q_bwd.push_back(from);  //mtx lock
-                        if (parent[from] != -1) {
-                            q_fwd.clear();  //mtx lock
-                            q_bwd.clear();  //mtx lock
-                            MeetnodeAtomic = from; //MeetnodeAtomic.store(from);    
-                            FoundMeet = true; //FoundMeet.store(true); 
+                    if(!FoundMeet) {
+                        int from = ReverseNameMapF[idx];
+                        const edges_matrix& a = graph[idx];
+                        if (a.capacity - a.flow > err && parent_rev[from] == -1) {  //&&NOT FOUND
+                            parent_rev[from] = ReverseNameMapS[idx];    //mtx lock
+                            q_bwd.push_back(from);  //mtx lock
+                            if (parent[from] != -1) {
+                                q_fwd.clear();  //mtx lock
+                                q_bwd.clear();  //mtx lock
+                                MeetnodeAtomic = from; //MeetnodeAtomic.store(from);    
+                                FoundMeet = true; //FoundMeet.store(true); 
+                            }
                         }
                     }
                 }
 
+
                 if(v != sink) {
                     for (const auto& [to, edgeIdx] : FastNameMap[v]) {
-                        //if(to != sink){
+                        if(!FoundMeet) {
                             if (graph[edgeIdx].flow > err && parent_rev[to] == -1) {  // Reverse in backward search //&&NOT FOUND
                                 parent_rev[to] = v; //mtx lock
                                 q_bwd.push_back(to);    //mtx lock
@@ -785,12 +833,13 @@ class Graph {
                                     FoundMeet = true; //FoundMeet.store(true); 
                                 }
                             }
-                        //}
                     }
+                }
             }
         }
     }
-*/
+    }
+
     void Edmonds_Karp() {
         const int source = sX;
         const int sink = tX;
@@ -1003,8 +1052,8 @@ class Graph {
     std::vector<edges_matrix> G, G_r, G_rk, f_matrix;
     std::vector<std::map<int, int>> NameMap;
     std::vector<int> ReverseNameMapF, ReverseNameMapS;
-    std::vector<std::vector<NameMapHelp>> FastNameMap;
-    std::vector<std::vector<int>> reverse_adj;
+    std::vector<std::vector<NameMapHelp>> FastNameMap, FastNameMap_perm;
+    std::vector<std::vector<int>> reverse_adj, reverse_adj_perm;
 
 
     double EDMONDSKARPTIME = 0;
