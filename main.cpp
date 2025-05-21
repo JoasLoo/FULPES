@@ -5,12 +5,16 @@
 #include <vector>
 #include <string>
 using namespace std;
+using namespace std::chrono;
+
+
+#include <chrono>
 
 
 const int instanceSize = 200; //number of EVs/jobs in instance
 int timeStep = 900; //quarterly granularity
 
-bool randomSample = false;
+bool randomSample = true;
 
 vector<int> FOCS_breakpoints;
 
@@ -18,27 +22,51 @@ InstanceData opendata_toC(const string& filename);
 
 
 int main() {
-    clock_t t1 = clock();
+
+    long long total_load = 0;
+    long long total_graph = 0;
+    long long total_init = 0;
+    long long total_solve = 0;
+
+    int repetitions = 100;
+
+    auto t1 = chrono::high_resolution_clock::now();
+
     InstanceData instance1 = opendata_toC("Data/DEMSdata_FOCS_v1.csv"); //open data file in C++ DEMSdata_FOCS_v1.csv ev_session_data_OR.csv
         //ev_session_data_OR.csv breaks if randomsample, or instancesize = 399 / 200
-    clock_t q1 = clock();
 
+    for (int i = 0; i < repetitions; ++i) {
+    
+    auto q1 = chrono::high_resolution_clock::now();
     Graph g;
-    clock_t q2 = clock();
+    auto q2 = chrono::high_resolution_clock::now();
     
     g.init_focs(instance1, timeStep, instanceSize, randomSample);
-    clock_t q3 = clock();
+    auto q3 = chrono::high_resolution_clock::now();
     //g.print_graph();   
     g.solve_focs();
     
-    clock_t qx = clock();
+    auto qx = chrono::high_resolution_clock::now();
 
     g.objective();
 
-    printf("X) LOADING C DATA            %.5f seconds\n", (double)(q1 - t1) / CLOCKS_PER_SEC);
-    printf("X) INIT C GRAPH            %.5f seconds\n", (double)(q2 - q1) / CLOCKS_PER_SEC);
-    printf("X) INIT C FOCS            %.5f seconds\n", (double)(q3 - q2) / CLOCKS_PER_SEC);
-    printf("X) SOLVE C FOCS            %.5f seconds\n", (double)(qx - q3) / CLOCKS_PER_SEC);
+    if (i==0) {
+        total_load  += duration_cast<microseconds>(q1 - t1).count();
+    }
+    
+    total_graph += duration_cast<microseconds>(q2 - q1).count();
+    total_init  += duration_cast<microseconds>(q3 - q2).count();
+    total_solve += duration_cast<microseconds>(qx - q3).count();
+
+    }
+    cout << fixed;
+    cout << "Average Timings (over " << repetitions << " runs):\n";
+    cout << "LOADING C DATA       " << total_load  << " micro-s\n";
+    cout << "INIT C GRAPH         " << total_graph / repetitions << " micro-s\n";
+    cout << "INIT C FOCS          " << total_init / repetitions  << " micro-s\n";
+    cout << "SOLVE C FOCS         " << total_solve / repetitions << " micro-s\n";
+
+
 
     return 0;
 }
@@ -107,10 +135,10 @@ InstanceData opendata_toC(const string& filename) {   //copied from: https://med
                     col_d.push_back(0.0); // Or handle invalid entries differently
                 }
             }
-            instance1.add_column(headers[i], move(col_d));
+            instance1.add_column(headers[i], std::move(col_d));
         }
 
-        instance1.add_column(headers[i], move(datainCols[i]));
+        instance1.add_column(headers[i], std::move(datainCols[i]));
         //cout << headers[i] << " " << datainCols[i][0] << "\n";
     }
     
