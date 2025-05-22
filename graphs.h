@@ -900,7 +900,7 @@ class Graph {
     int N = G_rk.size();  // or the number of unique nodes
 
     std::vector<int> parent(N, -1);
-    std::vector<int> parent_rev(tX, -1);
+    std::vector<int> parent_rev(N, -1);
     int meet_node = -1;
 
     //bool bfstool = true;
