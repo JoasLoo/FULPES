@@ -1,14 +1,15 @@
-#include "graphs.h"
+#include "graphs_basic.h"
 #include <iostream>
 #include <fstream>
 #include <sstream>
 #include <vector>
 #include <string>
+#include <chrono>
 using namespace std;
 using namespace std::chrono;
 
 
-#include <chrono>
+
 
 
 const int instanceSize = 200; //number of EVs/jobs in instance
@@ -41,7 +42,7 @@ int main() {
     Graph g;
     auto q2 = chrono::high_resolution_clock::now();
     
-    g.init_focs(instance1, timeStep, instanceSize, randomSample);
+    g.init_focs(instance1, timeStep, instanceSize, randomSample); //InstanceData instance, int timeStep, int instancesize, bool randomize, int I_a_count
     auto q3 = chrono::high_resolution_clock::now();
     //g.print_graph();   
     g.solve_focs();

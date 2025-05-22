@@ -20,30 +20,6 @@
 #include <atomic>
 #include <mutex>
 
-inline std::vector<double> sample_vector_C(const std::vector<double>& input, int N, bool randomSample) {
-    std::vector<double> result;
-
-    if (input.size() <= N) {
-        return input; // Return whole input if it's already small enough
-    }
-
-    if (randomSample) {
-        std::vector<size_t> indices(input.size());
-        std::iota(indices.begin(), indices.end(), 0); // Fill with 0..n-1
-        std::random_device rd;
-        std::mt19937 gen(rd());
-        std::shuffle(indices.begin(), indices.end(), gen);
-
-        for (size_t i = 0; i < N; ++i) {
-            result.push_back(input[indices[i]]);
-        }
-    } else {
-        result.insert(result.end(), input.begin(), input.begin() + N);
-    }
-
-    return result;
-}
-
 inline std::vector<size_t> get_sample_indices(size_t dataSize, int N, bool randomSample) {
     std::vector<size_t> indices(dataSize);
     std::iota(indices.begin(), indices.end(), 0); // Fill with 0, 1, ..., n-1
