@@ -1,4 +1,4 @@
-#include "graphs_basic.h"
+#include "graphs_mem.h"
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -7,10 +7,6 @@
 #include <chrono>
 using namespace std;
 using namespace std::chrono;
-
-
-
-
 
 const int instanceSize = 200; //number of EVs/jobs in instance
 int timeStep = 900; //quarterly granularity
@@ -39,9 +35,9 @@ int main() {
     for (int i = 0; i < repetitions; ++i) {
     
     auto q1 = chrono::high_resolution_clock::now();
-    //Graph g;
-    Graph g(1);
-    g.remove_empty(g.digraph);
+    Graph g;
+    //Graph g(1);
+    //g.remove_empty(g.digraph);
     auto q2 = chrono::high_resolution_clock::now();
     
     g.init_focs(instance1, timeStep, instanceSize, randomSample); //InstanceData instance, int timeStep, int instancesize, bool randomize, int I_a_count
