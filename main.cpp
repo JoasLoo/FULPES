@@ -1,8 +1,4 @@
-<<<<<<< Updated upstream
 #include "graphs_mem.h"
-=======
-#include "graphs_csr.h"
->>>>>>> Stashed changes
 #include <iostream>
 #include <fstream>
 #include <sstream>
