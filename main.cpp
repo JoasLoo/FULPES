@@ -1,4 +1,4 @@
-#include "graphs.h"
+#include "graphs_basic.h"
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -39,9 +39,9 @@ int main() {
     for (int i = 0; i < repetitions; ++i) {
     
     auto q1 = chrono::high_resolution_clock::now();
-    Graph g;
-    //Graph g(1);
-    //g.remove_empty(g.digraph);
+    //Graph g;
+    Graph g(1);
+    g.remove_empty(g.digraph);
     auto q2 = chrono::high_resolution_clock::now();
     
     g.init_focs(instance1, timeStep, instanceSize, randomSample); //InstanceData instance, int timeStep, int instancesize, bool randomize, int I_a_count

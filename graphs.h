@@ -279,8 +279,8 @@ class Graph {
         while (!selfterminate) {
             if(it == 0) {
                 G_rk = G_r;
-                reverse_adj = reverse_adj_perm;
-                FastNameMap = FastNameMap_perm;
+                //reverse_adj = reverse_adj_perm;
+                //FastNameMap = FastNameMap_perm;
             }
             update_network_capacities_g();
             //Edmonds_Karp();
@@ -510,8 +510,8 @@ class Graph {
             }
 
             //Decrease FastNameMap reverse_adj For faster execution time.
-            FastNameMap[Ikey].clear();      //from Ikey to X
-            reverse_adj[Ikey].clear();      //from X to Ikey
+            //FastNameMap[Ikey].clear();      //from Ikey to X
+            //reverse_adj[Ikey].clear();      //from X to Ikey
             
                 
         }

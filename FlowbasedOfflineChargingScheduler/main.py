@@ -61,7 +61,7 @@ randomSample = True
 for i in range(repetitions):
     t0 = time.perf_counter()
     # Real Training data
-    instanceData = pd.read_csv('../Data/DEMSdata_FOCS_v1.csv')
+    instanceData = pd.read_csv('../Data/ev_session_data_OR.csv') #ev_session_data_OR  DEMSdata_FOCS_v1
 
     t1 = time.perf_counter()
 
