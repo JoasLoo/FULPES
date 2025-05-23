@@ -1,6 +1,6 @@
 @echo off
 
-g++ -O3 -ffast-math -static-libstdc++ -funroll-loops -g -o main main.cpp
+g++ -O3 -ffast-math -static-libstdc++ -funroll-loops -o main main.cpp
 
 
 if %ERRORLEVEL% EQU 0 (
