@@ -19,6 +19,9 @@
 #include <thread>
 #include <atomic>
 #include <mutex>
+#include <chrono>
+
+using namespace std::chrono;
 
 inline std::vector<size_t> get_sample_indices(size_t dataSize, int N, bool randomSample) {
     std::vector<size_t> indices(dataSize);
@@ -272,22 +275,15 @@ class Graph {
         it = 0;
     }
 
-    double totalEDMONDKARP = 0;
     void solve_focs() {
         reset_caps(f_matrix);
         reset_flows(f_matrix);
         while (!selfterminate) {
             if(it == 0) {
                 G_rk = G_r;
-                //reverse_adj = reverse_adj_perm;
-                //FastNameMap = FastNameMap_perm;
             }
             update_network_capacities_g();
-            //Edmonds_Karp();
-            clock_t z1 = clock();
             Max_flow_solver();
-            clock_t z2 = clock();
-            totalEDMONDKARP += (double)(z2-z1);
             MaxDiff = Get_M(G_rk) - flow_val; 
             
             if (total_demand_r-flow_val < err) {
@@ -402,6 +398,7 @@ class Graph {
         }
 
         objNormalized = std::accumulate(powerSquare.begin(), powerSquare.end(), 0.0);
+        //std::cout << counting << "\n";
         //std::cout << "Objective value C++ = " << objNormalized << "\n";
         //return objNormalized;
     }
@@ -500,7 +497,7 @@ class Graph {
                 }
             }
 
-            for (const auto& [to, j] : NameMap[Ikey]) { //for goes from iX
+            for (const auto& [to, j] : FastNameMap[Ikey]) { //for goes from iX
                 if(AddingF) {  // if F is initiated in another round, add the flows to F.
                     f_matrix[j].flow += graph_rK[j].flow;
                 }
@@ -508,12 +505,6 @@ class Graph {
                 graph_rK[j].capacity = 0;
                 graph_rK[j].flow = 0;
             }
-
-            //Decrease FastNameMap reverse_adj For faster execution time.
-            //FastNameMap[Ikey].clear();      //from Ikey to X
-            //reverse_adj[Ikey].clear();      //from X to Ikey
-            
-                
         }
     }
 
@@ -568,54 +559,13 @@ class Graph {
     }
     
     void Max_flow_solver() {
-        clock_t z1 = clock();
         reset_flows(G_rk);   // Reset all flows to 0 for a DFS effect
         Edmonds_Karp_Bidirectional();
-
-        clock_t z2 = clock();
-        //EDMONDSKARPTIME += (double)(z2-z1);
     }
 
-    //Breadth First Search
-  /*  bool bfs(std::vector<int>& parent, const int& source, const int& sink, const std::vector<edges_matrix>& graph) {
-        static std::deque<int> q;
-        q.push_front(source);
-
-        std::fill(parent.begin()+1, parent.end(), -1);    //fill parent with -1 for all values.
-        int u = 0;
-        while (!q.empty()) {
-            u = q.front();
-            q.pop_front();
-
-            for (const auto& [to, edgeIdx] : FastNameMap[u]) {
-                const edges_matrix& a = graph[edgeIdx];
-                // `to` is the destination node name (e.g., "j0")
-                // `edgeIdx` is the unique index for edge (sX -> to)
-                if(a.capacity - a.flow > err){
-                    if (to == sink) {
-                        parent[to] = u;
-                        q.clear();
-                        return true;
-                    }
-                    else if (parent[to] == -1) {
-                        q.push_back(to);   //using a stack instead of a queue, LIFO instead of FIFO, results in a +- 8% speedup
-                        parent[to] = u;
-                    }
-                }
-            }
-            for (int idx : reverse_adj[u]) {
-                int from = ReverseNameMapF[idx];
-                if (parent[from] == -1 && graph[idx].flow > err) {
-                    q.push_back(from);
-                    parent[from] = ReverseNameMapS[idx];
-                }
-            }
-        }
-        return false;
-    }
-*/
     bool bidirectional_bfs(std::vector<int>& parent, std::vector<int>& parent_rev, int& meet_node, const int& source, const int& sink, const std::vector<edges_matrix>& graph) {
         static std::deque<int> q_fwd, q_bwd;
+        q_fwd.clear();  q_bwd.clear();
         parent.assign(parent.size(), -1);
         parent_rev.assign(parent_rev.size(), -1);
 
@@ -639,13 +589,12 @@ class Graph {
                                                 
                         if (parent_rev[to] != -1) {
                             meet_node = to;
-                            q_fwd.clear();  
-                            q_bwd.clear();
                             return true;
                         }
                     }
                 }
                 for (int idx : reverse_adj[u]) {
+                    
                     int from = ReverseNameMapF[idx];
                     if (parent[from] == -1 && graph[idx].flow > err && from != tX) { 
                         parent[from] = ReverseNameMapS[idx];    
@@ -653,8 +602,6 @@ class Graph {
                         q_fwd.push_back(from);  
                         if (parent_rev[from] != -1) {
                             meet_node = from;
-                            q_fwd.clear();  
-                            q_bwd.clear();  
                             return true;
                         }
                     }
@@ -667,6 +614,7 @@ class Graph {
                 q_bwd.pop_front();
 
                 for (int idx : reverse_adj[v]) {
+                    
                     int from = ReverseNameMapF[idx];
                     const edges_matrix& a = graph[idx];
                     if (a.capacity - a.flow > err && parent_rev[from] == -1) {  
@@ -674,8 +622,6 @@ class Graph {
                         q_bwd.push_back(from);  
                         if (parent[from] != -1) {
                             meet_node = from;
-                            q_fwd.clear();  
-                            q_bwd.clear();
                             return true;
                         }
                     }
@@ -683,13 +629,12 @@ class Graph {
 
                 if(v != sink) {
                     for (const auto& [to, edgeIdx] : FastNameMap[v]) {
+                        
                         if (graph[edgeIdx].flow > err && parent_rev[to] == -1) {  // Reverse in backward search 
                             parent_rev[to] = v; 
                             q_bwd.push_back(to);    
                             if (parent[to] != -1) {
                                 meet_node = to;
-                                q_fwd.clear();  
-                                q_bwd.clear();
                                 return true;
                             }
                         }
@@ -699,198 +644,6 @@ class Graph {
         }
         return false;
     }
-
-    //std::atomic<bool> FoundMeet = false;
-    //std::atomic<int> MeetnodeAtomic;
-    //std::atomic<bool> DoneExecuting = true;
-
-   /* bool bidirectional_bfs_threaded(std::vector<int>& parent, std::vector<int>& parent_rev, int& meet_node, const int& source, const int& sink, const std::vector<edges_matrix>& graph) {
-        std::deque<int> q_fwd, q_bwd;
-        parent.assign(parent.size(), -1);
-        parent_rev.assign(parent_rev.size(), -1);
-
-        q_fwd.push_front(source);
-        parent[source] = source;
-
-        q_bwd.push_front(sink);
-        parent_rev[sink] = sink;
-
-        if(DoneExecuting) {
-            DoneExecuting = false;
-            t1 = std::thread(&Graph::forward_search, this, std::ref(parent), std::ref(parent_rev), std::ref(q_fwd), std::ref(q_bwd), std::ref(graph));
-            t2 = std::thread(&Graph::backward_search, this, std::ref(parent), std::ref(parent_rev), std::ref(q_fwd), std::ref(q_bwd), std::ref(sink), std::ref(graph));
-        }
-        
-
-        //MeetnodeAtomic.store(-1);
-        //FoundMeet.store(false);
-        FoundMeet = false;
-        MeetnodeAtomic = -1;
-        bool found = FoundMeet; //FoundMeet.load();
-        while (!q_fwd.empty() && !q_bwd.empty() && !found) {
-            forward_search(parent, parent_rev, q_fwd, q_bwd, graph);
-            backward_search(parent, parent_rev, q_fwd, q_bwd, sink, graph);
-            //std::thread t1(&Graph::forward_search, this, std::ref(parent), std::ref(parent_rev), std::ref(q_fwd), std::ref(q_bwd), std::ref(graph));
-            //std::thread t2(&Graph::backward_search, this, std::ref(parent), std::ref(parent_rev), std::ref(q_fwd), std::ref(q_bwd), std::ref(sink), std::ref(graph));
-
-            //t1.join();
-            //t2.join();
-            found = FoundMeet;//FoundMeet.load();
-        }
-        if (found) {
-            meet_node = MeetnodeAtomic; //MeetnodeAtomic.load();
-            return true;
-        } else {
-            return false;
-        }   
-    }
-
-    void forward_search(std::vector<int>& parent, std::vector<int>& parent_rev, std::deque<int>& q_fwd, std::deque<int>& q_bwd, const std::vector<edges_matrix>& graph) {
-        while (!DoneExecuting) {
-        if (!q_fwd.empty() && !FoundMeet) {   //&&NOT FOUND
-                int u = q_fwd.front();  
-                q_fwd.pop_front();
-
-                for (const auto& [to, edgeIdx] : FastNameMap[u]) {
-                    if(!FoundMeet) {
-                        const edges_matrix& a = graph[edgeIdx];
-                        if (a.capacity - a.flow > err && parent[to] == -1) {    //&&NOT FOUND
-                            parent[to] = u; 
-                            q_fwd.push_back(to);    
-                                                    //start new thread if pushed_back.??
-                            if (parent_rev[to] != -1) {
-                                q_fwd.clear();  
-                                q_bwd.clear();  
-                                MeetnodeAtomic = to; //MeetnodeAtomic.store(to);    
-                                FoundMeet = true; //FoundMeet.store(true); 
-                            }
-                        }
-                    }
-                }
-                for (int idx : reverse_adj[u]) {
-                    if(!FoundMeet) {
-                        int from = ReverseNameMapF[idx];
-                        if (parent[from] == -1 && graph[idx].flow > err) {  //&&NOT FOUND
-                            parent[from] = ReverseNameMapS[idx];    
-                            q_fwd.push_back(from);  
-                            if (parent_rev[from] != -1) {
-                                q_fwd.clear();  
-                                q_bwd.clear();  
-                                MeetnodeAtomic = from; //MeetnodeAtomic.store(from);    
-                                FoundMeet = true; //FoundMeet.store(true); 
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    void backward_search(std::vector<int>& parent, std::vector<int>& parent_rev, std::deque<int>& q_fwd, std::deque<int>& q_bwd, const int& sink, const std::vector<edges_matrix>& graph) {
-        // Expand backward search
-        while(!DoneExecuting) {
-        if(!q_bwd.empty()&& !FoundMeet) {
-                int v = q_bwd.front();
-                q_bwd.pop_front();
-                for (int idx : reverse_adj[v]) {
-                    if(!FoundMeet) {
-                        int from = ReverseNameMapF[idx];
-                        const edges_matrix& a = graph[idx];
-                        if (a.capacity - a.flow > err && parent_rev[from] == -1) {  //&&NOT FOUND
-                            parent_rev[from] = ReverseNameMapS[idx];    
-                            q_bwd.push_back(from);  
-                            if (parent[from] != -1) {
-                                q_fwd.clear();  
-                                q_bwd.clear();  
-                                MeetnodeAtomic = from; //MeetnodeAtomic.store(from);    
-                                FoundMeet = true; //FoundMeet.store(true); 
-                            }
-                        }
-                    }
-                }
-
-
-                if(v != sink) {
-                    for (const auto& [to, edgeIdx] : FastNameMap[v]) {
-                        if(!FoundMeet) {
-                            if (graph[edgeIdx].flow > err && parent_rev[to] == -1) {  // Reverse in backward search //&&NOT FOUND
-                                parent_rev[to] = v; 
-                                q_bwd.push_back(to);    
-                                if (parent[to] != -1) {
-                                    q_fwd.clear();  
-                                    q_bwd.clear();  
-                                    MeetnodeAtomic = to; //MeetnodeAtomic.store(to);    
-                                    FoundMeet = true; //FoundMeet.store(true); 
-                                }
-                            }
-                    }
-                }
-            }
-        }
-    }
-    }
-
-    void Edmonds_Karp() {
-        const int source = sX;
-        const int sink = tX;
-        flow_val = 0;
-        std::vector<int> parent(NameMap.size(), -1);
-        parent[source] = source;
-
-        //bool bfstool  = true;
-
-        while (bfs(parent, source, sink, G_rk)) {
-
-            bool found = false;
-            double path_flow = std::numeric_limits<double>::max();
-
-            // Find bottleneck
-            for (int v = sink; v != source; v = parent[v]) {
-                bool Reverse = false;
-                int idx = NameMap[parent[v]][v];
-                if (idx == 0) {
-                    Reverse = true;
-                    idx = NameMap[v][parent[v]];
-                }
-                edges_matrix x = G_rk[idx];
-
-                if (!Reverse) {
-                    if (x.capacity - x.flow > err) {
-                        path_flow = std::min(path_flow, x.capacity - x.flow);
-                        found = true;
-                    }
-                } else {
-                    if (x.flow > err) {
-                        path_flow = std::min(path_flow, x.flow);
-                        found = true;
-                    }
-                }
-            }
-
-            // Update residual capacities
-            for (int v = sink; v != source; v = parent[v]) {
-                bool Reverse = false;
-                int idx = NameMap[parent[v]][v];
-                if (idx == 0) Reverse = true;
-
-                if (!Reverse) {
-                    if (G_rk[idx].capacity - G_rk[idx].flow > err) {
-                        G_rk[idx].flow += path_flow;
-                    }
-                } else {
-                    idx = NameMap[v][parent[v]];
-                    G_rk[idx].flow -= path_flow;
-                }
-            }
-        }
-        // Compute total flow from I_a nodes to sink
-        for (int i : I_a) {
-            int Ikey = iX + i;
-            flow_val += G_rk[NameMap[Ikey][tX]].flow;
-        }
-    }
-*/
-    double totalBFS = 0;
 
     void Edmonds_Karp_Bidirectional() {
     const int source = sX;
@@ -903,9 +656,10 @@ class Graph {
     std::vector<int> parent_rev(N, -1);
     int meet_node = -1;
 
-    //bool bfstool = true;
 
     while (bidirectional_bfs(parent, parent_rev, meet_node, source, sink, G_rk)) {
+
+
         double path_flow = std::numeric_limits<double>::max();
         bool found = false;
 

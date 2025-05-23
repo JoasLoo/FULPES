@@ -368,15 +368,24 @@ class Graph {
                 selfterminate = true;
             }
         }
-        if (it <= 10) {
-            objective();
-            /*printf("X) TOTAL EDMONDS KARP               %.5f seconds\n", EDMONDSKARPTIME / CLOCKS_PER_SEC); 
-            printf("X) TOTAL BFS                        %.5f seconds\n", totalBFS / CLOCKS_PER_SEC);
-            printf("X) TOTAL 1                          %.5f seconds\n", total1 / CLOCKS_PER_SEC);
-            printf("X) TOTAL 2                          %.5f seconds\n", total2 / CLOCKS_PER_SEC);
-            printf("X) TOTAL 3                          %.5f seconds\n", total3 / CLOCKS_PER_SEC);
-            printf("X) TOTAL 4                          %.5f seconds\n", total4 / CLOCKS_PER_SEC);*/
+    }
+
+    void objective() {
+        int m = intervals_start.size();
+        std::vector<double> p_i(m);
+        for (int i = 0; i < m; i++) {
+            int Ikey = iX + i;
+            double flow = f_matrix[NameMap[Ikey][tX]].flow;
+            p_i[i] = (flow / len_i[i]) * timeBase;
         }
+        std::vector<double> powerSquare(m);
+        for (int i = 0; i < m; ++i) {
+            powerSquare[i] = (p_i[i] * p_i[i]) * (len_i[i] / timestep);
+        }
+
+        objNormalized = std::accumulate(powerSquare.begin(), powerSquare.end(), 0.0);
+        std::cout << "Objective value C++ = " << objNormalized << "\n";
+        //return objNormalized;
     }
 
     private: 
@@ -613,7 +622,10 @@ class Graph {
         const int source = sX;
         const int sink = tX;
         flow_val = 0;
-        std::vector<int> parent(NameMap.size(), -1);
+
+        int N = G_rk.size();  // or the number of unique nodes
+
+        std::vector<int> parent(N, -1);
         parent[source] = source;
 
         //bool bfstool  = true;
@@ -673,24 +685,6 @@ class Graph {
             int Ikey = iX + i;
             flow_val += G_rk[NameMap[Ikey][tX]].flow;
         }
-    }
-
-    void objective() {
-        int m = intervals_start.size();
-        std::vector<double> p_i(m);
-        for (int i = 0; i < m; i++) {
-            int Ikey = iX + i;
-            double flow = f_matrix[NameMap[Ikey][tX]].flow;
-            p_i[i] = (flow / len_i[i]) * timeBase;
-        }
-        std::vector<double> powerSquare(m);
-        for (int i = 0; i < m; ++i) {
-            powerSquare[i] = (p_i[i] * p_i[i]) * (len_i[i] / timestep);
-        }
-
-        objNormalized = std::accumulate(powerSquare.begin(), powerSquare.end(), 0.0);
-        std::cout << "Objective value C++ = " << objNormalized << "\n";
-        //return objNormalized;
     }
 
     inline double length_sum_intervals(const std::vector<int>& I_list, const std::vector<int>& L_list) {
