@@ -16,9 +16,6 @@
 #include <random>
 #include <set>
 #include <queue>
-#include <thread>
-#include <atomic>
-#include <mutex>
 #include <chrono>
 
 using namespace std::chrono;
@@ -399,7 +396,7 @@ class Graph {
 
         objNormalized = std::accumulate(powerSquare.begin(), powerSquare.end(), 0.0);
         //std::cout << counting << "\n";
-        //std::cout << "Objective value C++ = " << objNormalized << "\n";
+        std::cout << "Objective value C++ = " << objNormalized << "\n";
         //return objNormalized;
     }
 
@@ -560,6 +557,7 @@ class Graph {
     
     void Max_flow_solver() {
         reset_flows(G_rk);   // Reset all flows to 0 for a DFS effect
+        //SAP_Max_Flow();
         Edmonds_Karp_Bidirectional();
     }
 
@@ -749,6 +747,153 @@ class Graph {
     }
 }
     
+
+    void SAP_Max_Flow() {
+    const int N = G_rk.size();
+    std::vector<int> height(N, N);  // Initialize heights
+    std::vector<int> count(2 * N, 0);
+    std::vector<size_t> currEdge(N, 0);
+    std::queue<int> q;
+
+    // Reverse BFS from sink to set heights
+    height[tX] = 0;
+    q.push(tX);
+    while (!q.empty()) {
+        int u = q.front(); q.pop();
+        for (int idx : reverse_adj[u]) {
+            int from = ReverseNameMapF[idx];
+            const edges_matrix& e = G_rk[idx];
+            if (e.capacity - e.flow > err && height[from] == N) {
+                height[from] = height[u] + 1;
+                q.push(from);
+            }
+        }
+        
+        if (u != tX) {
+            for (const auto& [to, idx] : FastNameMap[u]) {
+                const edges_matrix& e = G_rk[idx];
+                if (e.flow > err && height[to] == N) {
+                    height[to] = height[u] + 1;
+                    q.push(to);
+                }
+            }
+        }
+    }
+
+    if (height[sX] == N) return; // no path
+
+    for (int h : height) if (h < N) count[h]++;
+
+    std::vector<int> path = {sX};
+    int u = sX;
+    bool done = false;
+
+    while (!done) {
+        if (u == tX) {
+            // augment along path
+            double bottleneck = std::numeric_limits<double>::max();
+            for (size_t i = 0; i < path.size() - 1; ++i) {
+                int from = path[i];
+                int to = path[i + 1];
+                int idx = NameMap[from][to];
+                static bool Reverse = false;
+                if (idx == 0) {
+                    Reverse = true;
+                    idx = NameMap[to][from];
+                }
+                const edges_matrix& x = G_rk[idx];
+
+                if (!Reverse) {
+                    if (x.capacity - x.flow > err) {
+                        bottleneck = std::min(bottleneck, x.capacity - x.flow);
+                    }
+                    else {
+                        bottleneck = 0;
+                    }
+                } else {
+                    if (x.flow > err) {
+                        bottleneck = std::min(bottleneck, x.flow);
+                    }
+                    else {
+                        bottleneck = 0;
+                    }
+                }
+            }
+            
+            for (size_t i = 0; i < path.size() - 1; ++i) {
+                int from = path[i];
+                int to = path[i + 1];
+                int idx = NameMap[from][to];
+                if (G_rk[idx].capacity - G_rk[idx].flow > err) {
+                    G_rk[idx].flow += bottleneck;
+                } else {
+                    G_rk[NameMap[to][from]].flow -= bottleneck;
+                }
+                
+            }
+            flow_val += bottleneck;
+            path = {sX};
+            u = sX;
+            continue;
+        }
+
+        bool advanced = false;
+        for (; currEdge[u] < FastNameMap[u].size(); ++currEdge[u]) {
+            int to = FastNameMap[u][currEdge[u]].to;
+            int idx = NameMap[u][to];
+            if (G_rk[idx].capacity - G_rk[idx].flow > err && height[u] == height[to] + 1) {
+                path.push_back(to);
+                u = to;
+                advanced = true;
+                break;
+            }
+        }
+
+        if (!advanced) {
+            // Relabel
+            int minHeight = std::numeric_limits<int>::max();
+            for (const auto& [to, idx] : FastNameMap[u]) {
+                if (G_rk[idx].capacity - G_rk[idx].flow > err) {
+                    minHeight = std::min(minHeight, height[to]);
+                }
+            }
+            if (minHeight == std::numeric_limits<int>::max()) {
+                // No admissible edges from u: stuck
+                if (u == sX) {
+                    done = true;  // cannot relabel at source
+                } else {
+                    path.pop_back();
+                    u = path.back();
+                }
+                continue;
+            }
+
+            int oldHeight = height[u];
+            count[height[u]]--;
+            if (count[height[u]] == 0) {
+                done = true;  // gap heuristic
+                continue;
+            }
+            height[u] = minHeight + 1;
+            count[height[u]]++;
+            currEdge[u] = 0;
+            if (u != sX) {
+                path.pop_back();
+                u = path.back();
+            } else {
+                done = true;  // fallback: no more progress at source
+            }
+        }
+
+    }
+    std::cout << "no\n";
+
+    // Phase 2: fallback to BFS
+    Edmonds_Karp_Bidirectional();
+}
+
+
+
     inline double length_sum_intervals(const std::vector<int>& I_list, const std::vector<int>& L_list) {
         double sum = 0.0;  // Initialize sum to 0
         for (int i : I_list) {  // Loop over each index in I_list

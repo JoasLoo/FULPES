@@ -45,7 +45,7 @@ from LP import LP
 from FOCS import FOCS, FlowNet, FlowOperations, FOCSinstance
 from Bookkeeping import Bookkeeping
 
-repetitions = 500 #Number of iterations to find average time.
+repetitions = 2 #Number of iterations to find average time.
 
 total_load = 0
 total_graph = 0
@@ -54,9 +54,9 @@ total_solve = 0
 
 
 
-instanceSize = 200 #number of EVs/jobs in instance
+instanceSize = 600 #number of EVs/jobs in instance
 timeStep = 900 #quarterly granularity
-maxFlowAlg = dinitz #alternatively use e.g., edmonds_karp, preflow_push, or dinitz
+maxFlowAlg = edmonds_karp #alternatively use e.g., edmonds_karp, preflow_push, or dinitz
 randomSample = True
 for i in range(repetitions):
     t0 = time.perf_counter()
@@ -78,7 +78,7 @@ for i in range(repetitions):
     flowOp = FlowOperations(flowNet.G, instance)
     t3 = time.perf_counter()
     focs = FOCS(instance, flowNet, flowOp)
-    focs.flow_func = shortest_augmenting_path
+    focs.flow_func = maxFlowAlg
     t4 = time.perf_counter()
     f = focs.solve_focs(MPCstopper=False, MPCcondition=0)
     t5 = time.perf_counter()
