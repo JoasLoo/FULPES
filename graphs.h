@@ -267,28 +267,37 @@ class Graph {
         reverse_adj_perm = reverse_adj;
 
         G_r = G;
-        total_demand_r = Get_M(G_r);  
+        G_rk = G_r;
+        total_demand_r = Get_M();  
         selfterminate = false;
         it = 0;
     }
 
     void solve_focs() {
+        auto q1 = std::chrono::high_resolution_clock::now();
+        auto q2 = std::chrono::high_resolution_clock::now();
+        auto q3 = std::chrono::high_resolution_clock::now();
+        auto q4 = std::chrono::high_resolution_clock::now();
         reset_caps(f_matrix);
         reset_flows(f_matrix);
         while (!selfterminate) {
-            if(it == 0) {
-                G_rk = G_r;
-            }
             update_network_capacities_g();
             //print_graph();
             Max_flow_solver();
-            MaxDiff = Get_M(G_rk) - flow_val; 
+            
+            MaxDiff = Get_M() - flow_val; 
+            int N = G_rk.size();
             
             if (total_demand_r-flow_val < err) {
                 //end round
 
                 //Check for subcrit. For some instances, there are still active intervals that only now don't reach the max anymore
                 subCrit_mask.clear();
+                subCrit_mask.reserve(N);
+
+                subCrit.clear();
+                subCrit.reserve(N);
+
                 int toKey = tX;
                 for (int i : I_a) {
                     int fromKey = iX + i;
@@ -298,8 +307,6 @@ class Graph {
                     subCrit_mask.push_back(isCritical);
                 }
 
-
-                subCrit.clear();
                 for (size_t i = 0; i < I_a.size(); ++i) {
                     if (subCrit_mask[i]) {
                         subCrit.push_back(I_a[i]);
@@ -332,7 +339,9 @@ class Graph {
                     std::sort(I_a.begin(), I_a.end());  // Sort I_a in ascending order
                     I_p.clear();
 
-                    total_demand_r = Get_M(G_r)-flow_val_saved;
+                    G_rk = G_r;
+
+                    total_demand_r = Get_M()-flow_val_saved;
 
                     flow_val_saved += flow_val;
                 
@@ -343,6 +352,11 @@ class Graph {
             else {
                 
                 subCrit_mask.clear();
+                subCrit_mask.reserve(N);
+
+                subCrit.clear();
+                subCrit.reserve(N);
+
                 int toKey = tX;
                 for (int i : I_a) {
                     int fromKey = iX + i;
@@ -351,7 +365,6 @@ class Graph {
                     subCrit_mask.push_back(isCritical);
                 }
 
-                subCrit.clear();
                 for (size_t i = 0; i < I_a.size(); ++i) {
                     if (subCrit_mask[i]) {
                         subCrit.push_back(I_a[i]);
@@ -360,7 +373,7 @@ class Graph {
 
                 reduce_network(subCrit, G_rk);
 
-                total_demand_r = Get_M(G_rk)-flow_val_saved;
+                total_demand_r = Get_M()-flow_val_saved;
 
                 I_p.insert(I_p.end(), subCrit.begin(), subCrit.end());
 
@@ -374,13 +387,9 @@ class Graph {
                 I_a = new_I_a;
                 it++;
             } 
-            if (it > 10) {
-                selfterminate = true;
-            }
-            
         }
-        //printf("X) %.5f\n", totalEDMONDKARP / CLOCKS_PER_SEC);
     }
+    
 
     void objective() {
         int m = intervals_start.size();
@@ -556,10 +565,10 @@ class Graph {
         }
         else {
             if (rd == 0) {
-                demand = Get_M(G_rk);
+                demand = Get_M();
             }
             else {
-                demand = Get_M(G_rk)-flow_val_saved;
+                demand = Get_M()-flow_val_saved;
             }
             demand_normalized = demand / length_sum_intervals(I_a, len_i);
             for (int i : I_a) {
@@ -568,7 +577,7 @@ class Graph {
             }
         }
     }
-    
+
     void Max_flow_solver() {
         //reset_flows(G_rk);   // Reset all flows to 0 for a DFS effect
         //Edmonds_Karp_Bidirectional();
@@ -908,15 +917,15 @@ class Graph {
         return sum;  // Return the total
     }
 
-    double Get_M(std::vector<edges_matrix> X) {
+    double Get_M() {
             double M = 0;
             for (int j : jobs) {    //jobs is correct.
                 int jobKey = jX + j;
                 if (M == 0) {
-                    M = X[NameMap[sX][jobKey]].capacity;
+                    M = G_rk[NameMap[sX][jobKey]].capacity;
                 }
                 else {
-                    M += X[NameMap[sX][jobKey]].capacity;
+                    M += G_rk[NameMap[sX][jobKey]].capacity;
                 }
             }
             return M;

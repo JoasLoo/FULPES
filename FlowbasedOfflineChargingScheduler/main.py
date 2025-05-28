@@ -45,7 +45,7 @@ from LP import LP
 from FOCS import FOCS, FlowNet, FlowOperations, FOCSinstance
 from Bookkeeping import Bookkeeping
 
-repetitions = 2 #Number of iterations to find average time.
+repetitions = 5 #Number of iterations to find average time.
 
 total_load = 0
 total_graph = 0
@@ -54,7 +54,7 @@ total_solve = 0
 
 
 
-instanceSize = 600 #number of EVs/jobs in instance
+instanceSize = 2000 #number of EVs/jobs in instance
 timeStep = 900 #quarterly granularity
 maxFlowAlg = edmonds_karp #alternatively use e.g., edmonds_karp, preflow_push, or dinitz
 randomSample = True

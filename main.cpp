@@ -8,7 +8,7 @@
 using namespace std;
 using namespace std::chrono;
 
-const int instanceSize = 600; //number of EVs/jobs in instance
+const int instanceSize = 2000; //number of EVs/jobs in instance
 int timeStep = 900; //quarterly granularity
 
 bool randomSample = true;
@@ -25,7 +25,7 @@ int main() {
     long long total_init = 0;
     long long total_solve = 0;
 
-    int repetitions = 100;
+    int repetitions = 200;
 
     auto t1 = chrono::high_resolution_clock::now();
 
