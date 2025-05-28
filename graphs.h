@@ -280,6 +280,7 @@ class Graph {
                 G_rk = G_r;
             }
             update_network_capacities_g();
+            //print_graph();
             Max_flow_solver();
             MaxDiff = Get_M(G_rk) - flow_val; 
             
@@ -396,10 +397,23 @@ class Graph {
 
         objNormalized = std::accumulate(powerSquare.begin(), powerSquare.end(), 0.0);
         //std::cout << counting << "\n";
-        std::cout << "Objective value C++ = " << objNormalized << "\n";
+        //std::cout << "Objective value C++ = " << objNormalized << "\n";
         //return objNormalized;
     }
 
+    void print_graph() {
+        for (int i = 0; i < G_rk.size(); i++) {
+            for (int from = tX; from < reverse_adj.size(); from--) {
+                for (int idx : reverse_adj[from]) {
+                    int to = ReverseNameMapF[idx];
+                    if (idx == i) {
+                        std::cout << "i:" << i << "\tFrom: " << to << " \t To: " << from;
+                    }
+                }
+            }
+            std::cout << "  \t| Cap: " << G_rk[i].capacity << " \t| Flow: " << G_rk[i].flow << "\n";
+        }
+    }
 
     private: 
 
@@ -556,22 +570,23 @@ class Graph {
     }
     
     void Max_flow_solver() {
-        reset_flows(G_rk);   // Reset all flows to 0 for a DFS effect
-        //SAP_Max_Flow();
-        Edmonds_Karp_Bidirectional();
+        //reset_flows(G_rk);   // Reset all flows to 0 for a DFS effect
+        //Edmonds_Karp_Bidirectional();
+        //reset is not necessary for SAP, giving a huge performance boost :D
+        SAP_Max_Flow(); 
     }
 
-    bool bidirectional_bfs(std::vector<int>& parent, std::vector<int>& parent_rev, int& meet_node, const int& source, const int& sink, const std::vector<edges_matrix>& graph) {
+    bool bidirectional_bfs(std::vector<int>& parent, std::vector<int>& parent_rev, int& meet_node, const std::vector<edges_matrix>& graph) {
         static std::deque<int> q_fwd, q_bwd;
         q_fwd.clear();  q_bwd.clear();
         parent.assign(parent.size(), -1);
         parent_rev.assign(parent_rev.size(), -1);
 
-        q_fwd.push_front(source);
-        parent[source] = source;
+        q_fwd.push_front(sX);
+        parent[sX] = sX;
 
-        q_bwd.push_front(sink);
-        parent_rev[sink] = sink;
+        q_bwd.push_front(tX);
+        parent_rev[tX] = tX;
         while (!q_fwd.empty() && !q_bwd.empty()) {
 
             // Expand forward search
@@ -625,7 +640,7 @@ class Graph {
                     }
                 }
 
-                if(v != sink) {
+                if(v != tX) {
                     for (const auto& [to, edgeIdx] : FastNameMap[v]) {
                         
                         if (graph[edgeIdx].flow > err && parent_rev[to] == -1) {  // Reverse in backward search 
@@ -644,8 +659,6 @@ class Graph {
     }
 
     void Edmonds_Karp_Bidirectional() {
-    const int source = sX;
-    const int sink = tX;
     flow_val = 0;
 
     int N = G_rk.size();  // or the number of unique nodes
@@ -655,14 +668,14 @@ class Graph {
     int meet_node = -1;
 
 
-    while (bidirectional_bfs(parent, parent_rev, meet_node, source, sink, G_rk)) {
+    while (bidirectional_bfs(parent, parent_rev, meet_node, G_rk)) {
 
 
         double path_flow = std::numeric_limits<double>::max();
         bool found = false;
 
         // Reconstruct forward path: source -> meet_node
-        for (int v = meet_node; v != source; v = parent.at(v)) {
+        for (int v = meet_node; v != sX; v = parent.at(v)) {
             bool Reverse = false;
             //std::cout << "parent.at(v): " << parent.at(v) << " | meet_node: " << v << "\n";
             if (meet_node == tX) {
@@ -689,7 +702,7 @@ class Graph {
         }
         
         // Reconstruct backward path: meet_node -> sink (via parent_rev)
-        for (int v = meet_node; v != sink; v = parent_rev.at(v)) {
+        for (int v = meet_node; v != tX; v = parent_rev.at(v)) {
             int u = parent_rev.at(v);
             bool Reverse = false;
             int idx = NameMap[v][u];
@@ -716,7 +729,7 @@ class Graph {
         if (!found) break;
 
         // Update backward path
-        for (int v = meet_node; v != sink; v = parent_rev[v]) {
+        for (int v = meet_node; v != tX; v = parent_rev[v]) {
             int u = parent_rev[v];
             int idx = NameMap[v][u];
             if (G_rk[idx].capacity - G_rk[idx].flow > err) {
@@ -728,7 +741,7 @@ class Graph {
         }
 
         // Update forward path
-        for (int v = meet_node; v != source; v = parent[v]) {
+        for (int v = meet_node; v != sX; v = parent[v]) {
             int u = parent[v];
             int idx = NameMap[u][v];
             if (G_rk[idx].capacity - G_rk[idx].flow > err) {
@@ -749,9 +762,9 @@ class Graph {
     
 
     void SAP_Max_Flow() {
+
     const int N = G_rk.size();
     std::vector<int> height(N, N);  // Initialize heights
-    std::vector<int> count(2 * N, 0);
     std::vector<size_t> currEdge(N, 0);
     std::queue<int> q;
 
@@ -781,8 +794,6 @@ class Graph {
     }
 
     if (height[sX] == N) return; // no path
-
-    for (int h : height) if (h < N) count[h]++;
 
     std::vector<int> path = {sX};
     int u = sX;
@@ -818,12 +829,13 @@ class Graph {
                         bottleneck = 0;
                     }
                 }
-            }
+            }      
             
             for (size_t i = 0; i < path.size() - 1; ++i) {
                 int from = path[i];
                 int to = path[i + 1];
                 int idx = NameMap[from][to];
+                const edges_matrix& e = G_rk[idx];
                 if (G_rk[idx].capacity - G_rk[idx].flow > err) {
                     G_rk[idx].flow += bottleneck;
                 } else {
@@ -841,7 +853,7 @@ class Graph {
         for (; currEdge[u] < FastNameMap[u].size(); ++currEdge[u]) {
             int to = FastNameMap[u][currEdge[u]].to;
             int idx = NameMap[u][to];
-            if (G_rk[idx].capacity - G_rk[idx].flow > err && height[u] == height[to] + 1) {
+            if (G_rk[idx].capacity - G_rk[idx].flow > err && height[u] > height[to]) {
                 path.push_back(to);
                 u = to;
                 advanced = true;
@@ -850,6 +862,7 @@ class Graph {
         }
 
         if (!advanced) {
+            
             // Relabel
             int minHeight = std::numeric_limits<int>::max();
             for (const auto& [to, idx] : FastNameMap[u]) {
@@ -862,20 +875,14 @@ class Graph {
                 if (u == sX) {
                     done = true;  // cannot relabel at source
                 } else {
+                    height[path.back()] = std::numeric_limits<int>::max();
                     path.pop_back();
                     u = path.back();
                 }
                 continue;
             }
 
-            int oldHeight = height[u];
-            count[height[u]]--;
-            if (count[height[u]] == 0) {
-                done = true;  // gap heuristic
-                continue;
-            }
             height[u] = minHeight + 1;
-            count[height[u]]++;
             currEdge[u] = 0;
             if (u != sX) {
                 path.pop_back();
@@ -886,7 +893,6 @@ class Graph {
         }
 
     }
-    std::cout << "no\n";
 
     // Phase 2: fallback to BFS
     Edmonds_Karp_Bidirectional();

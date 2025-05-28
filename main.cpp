@@ -8,10 +8,10 @@
 using namespace std;
 using namespace std::chrono;
 
-const int instanceSize = 200; //number of EVs/jobs in instance
+const int instanceSize = 600; //number of EVs/jobs in instance
 int timeStep = 900; //quarterly granularity
 
-bool randomSample = false;
+bool randomSample = true;
 
 vector<int> FOCS_breakpoints;
 
@@ -25,11 +25,11 @@ int main() {
     long long total_init = 0;
     long long total_solve = 0;
 
-    int repetitions = 1;
+    int repetitions = 100;
 
     auto t1 = chrono::high_resolution_clock::now();
 
-    InstanceData instance1 = opendata_toC("Data/DEMSdata_FOCS_v1.csv"); //open data file in C++ DEMSdata_FOCS_v1.csv ev_session_data_OR.csv
+    InstanceData instance1 = opendata_toC("Data/ev_session_data_OR.csv"); //open data file in C++ DEMSdata_FOCS_v1.csv ev_session_data_OR.csv
         //ev_session_data_OR.csv breaks if randomsample, or instancesize = 399 / 200
 
     for (int i = 0; i < repetitions; ++i) {
