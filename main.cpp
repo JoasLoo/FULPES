@@ -8,7 +8,7 @@
 using namespace std;
 using namespace std::chrono;
 
-const int instanceSize = 2000; //number of EVs/jobs in instance
+const int instanceSize = 200; //number of EVs/jobs in instance
 int timeStep = 900; //quarterly granularity
 
 bool randomSample = true;

@@ -390,7 +390,6 @@ class Graph {
         }
     }
     
-
     void objective() {
         int m = intervals_start.size();
         std::vector<double> p_i(m);
@@ -769,7 +768,6 @@ class Graph {
     }
 }
     
-
     void SAP_Max_Flow() {
 
     const int N = G_rk.size();
@@ -906,8 +904,6 @@ class Graph {
     // Phase 2: fallback to BFS
     Edmonds_Karp_Bidirectional();
 }
-
-
 
     inline double length_sum_intervals(const std::vector<int>& I_list, const std::vector<int>& L_list) {
         double sum = 0.0;  // Initialize sum to 0
