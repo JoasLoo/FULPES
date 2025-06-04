@@ -8,7 +8,7 @@
 using namespace std;
 using namespace std::chrono;
 
-const int instanceSize = 200; //number of EVs/jobs in instance
+const int instanceSize = 2000; //number of EVs/jobs in instance
 int timeStep = 900; //quarterly granularity
 
 bool randomSample = true;
@@ -25,7 +25,7 @@ int main() {
     long long total_init = 0;
     long long total_solve = 0;
 
-    int repetitions = 200;
+    int repetitions = 100;
 
     auto t1 = chrono::high_resolution_clock::now();
 
@@ -59,10 +59,10 @@ int main() {
 
     }
     cout << fixed;
-    cout << "Average Timings (over " << repetitions << " runs):\n";
-    cout << "LOADING C DATA       " << total_load  << " micro-s\n";
-    cout << "INIT C GRAPH         " << total_graph / repetitions << " micro-s\n";
-    cout << "INIT C FOCS          " << total_init / repetitions  << " micro-s\n";
+    //cout << "Average Timings (over " << repetitions << " runs):\n";
+    //cout << "LOADING C DATA       " << total_load  << " micro-s\n";
+    //cout << "INIT C GRAPH         " << total_graph / repetitions << " micro-s\n";
+    //cout << "INIT C FOCS          " << total_init / repetitions  << " micro-s\n";
     cout << "SOLVE C FOCS         " << total_solve / repetitions << " micro-s\n";
 
 

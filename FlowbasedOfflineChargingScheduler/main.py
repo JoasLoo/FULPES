@@ -45,7 +45,7 @@ from LP import LP
 from FOCS import FOCS, FlowNet, FlowOperations, FOCSinstance
 from Bookkeeping import Bookkeeping
 
-repetitions = 5 #Number of iterations to find average time.
+repetitions = 100 #Number of iterations to find average time.
 
 total_load = 0
 total_graph = 0
@@ -54,50 +54,56 @@ total_solve = 0
 
 
 
-instanceSize = 2000 #number of EVs/jobs in instance
+#instanceSize = 200 #number of EVs/jobs in instance
 timeStep = 900 #quarterly granularity
-maxFlowAlg = edmonds_karp #alternatively use e.g., edmonds_karp, preflow_push, or dinitz
+maxFlowAlg = shortest_augmenting_path #alternatively use e.g., edmonds_karp, preflow_push, or dinitz
 randomSample = True
-for i in range(repetitions):
-    t0 = time.perf_counter()
-    # Real Training data
-    instanceData = pd.read_csv('../Data/ev_session_data_OR.csv') #ev_session_data_OR  DEMSdata_FOCS_v1
+for instanceSize in range(100, 201, 100):
+    print(instanceSize)
+    total_load = 0
+    total_graph = 0
+    total_init = 0
+    total_solve = 0
+    for i in range(repetitions):
+        t0 = time.perf_counter()
+        # Real Training data
+        instanceData = pd.read_csv('../Data/ev_session_data_OR.csv') #ev_session_data_OR  DEMSdata_FOCS_v1
 
-    t1 = time.perf_counter()
+        t1 = time.perf_counter()
 
-    if not randomSample:
-        instance = FOCSinstance(instanceData[:instanceSize], timeStep)
-    if randomSample:
-        sample = sorted(random.sample(range(0,len(instanceData)), instanceSize))
-        instance = FOCSinstance(instanceData.iloc[sample], timeStep)  
-    t2 = time.perf_counter()
-    #print('How instance is formatted:\n', instanceData.iloc[sample])
-    '''--------------start FOCS--------------'''
-    flowNet = FlowNet()
-    flowNet.focs_instance_to_network(instance)
-    flowOp = FlowOperations(flowNet.G, instance)
-    t3 = time.perf_counter()
-    focs = FOCS(instance, flowNet, flowOp)
-    focs.flow_func = maxFlowAlg
-    t4 = time.perf_counter()
-    f = focs.solve_focs(MPCstopper=False, MPCcondition=0)
-    t5 = time.perf_counter()
+        if not randomSample:
+            instance = FOCSinstance(instanceData[:instanceSize], timeStep)
+        if randomSample:
+            sample = sorted(random.sample(range(0,len(instanceData)), instanceSize))
+            instance = FOCSinstance(instanceData.iloc[sample], timeStep)  
+        t2 = time.perf_counter()
+        #print('How instance is formatted:\n', instanceData.iloc[sample])
+        '''--------------start FOCS--------------'''
+        flowNet = FlowNet()
+        flowNet.focs_instance_to_network(instance)
+        flowOp = FlowOperations(flowNet.G, instance)
+        t3 = time.perf_counter()
+        focs = FOCS(instance, flowNet, flowOp)
+        focs.flow_func = maxFlowAlg
+        t4 = time.perf_counter()
+        f = focs.solve_focs(MPCstopper=False, MPCcondition=0)
+        t5 = time.perf_counter()
 
-    obj_val = focs.objective()
-    #print('FOCS objective value = ', obj_val)
+        obj_val = focs.objective()
+        #print('FOCS objective value = ', obj_val)
 
-    total_load += (t2 - t1) * 1_000_000
-    total_graph += (t3 - t2) * 1_000_000
-    total_init  += (t4 - t3) * 1_000_000
-    total_solve += (t5 - t4) * 1_000_000
+        total_load += (t2 - t1) * 1_000_000
+        total_graph += (t3 - t2) * 1_000_000
+        total_init  += (t4 - t3) * 1_000_000
+        total_solve += (t5 - t4) * 1_000_000
 
 
-#print('FOCS flow (schedule in middle edge layer): \n', focs.f)
+    #print('FOCS flow (schedule in middle edge layer): \n', focs.f)
 
-print(f"Avg load time (us): {total_load / repetitions}")
-print(f"Avg graph setup time (us): {total_graph / repetitions}")
-print(f"Avg init time (us): {total_init / repetitions}")
-print(f"Avg solve time (us): {total_solve / repetitions}")
+    print(f"Avg load time (us): {total_load / repetitions}")
+    print(f"Avg graph setup time (us): {total_graph / repetitions}")
+    print(f"Avg init time (us): {total_init / repetitions}")
+    print(f"Avg solve time (us): {round(total_solve / repetitions)}")
 
 
 
