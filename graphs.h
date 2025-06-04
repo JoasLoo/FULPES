@@ -17,6 +17,7 @@
 #include <set>
 #include <queue>
 #include <chrono>
+#include <fstream>
 
 using namespace std::chrono;
 
@@ -282,6 +283,9 @@ class Graph {
         reset_flows(f_matrix);
         while (!selfterminate) {
             update_network_capacities_g();
+
+            print_graph();
+            break;
             //print_graph();
             Max_flow_solver();
             
@@ -410,17 +414,20 @@ class Graph {
     }
 
     void print_graph() {
+        std::ofstream myfile;
+        myfile.open("graph.txt");
         for (int i = 0; i < G_rk.size(); i++) {
             for (int from = tX; from < reverse_adj.size(); from--) {
                 for (int idx : reverse_adj[from]) {
                     int to = ReverseNameMapF[idx];
                     if (idx == i) {
-                        std::cout << "i:" << i << "\tFrom: " << to << " \t To: " << from;
+                        myfile  << "" << to << " " << from;
                     }
                 }
             }
-            std::cout << "  \t| Cap: " << G_rk[i].capacity << " \t| Flow: " << G_rk[i].flow << "\n";
+            myfile  << " " << G_rk[i].capacity << "\n";
         }
+        myfile.close();
     }
 
     private: 
