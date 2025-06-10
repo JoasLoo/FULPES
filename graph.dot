@@ -1,0 +1,31 @@
+digraph G {
+    0 -> 1 [label="Cap: 22.231\nFlow: 3.36214"];
+    0 -> 2 [label="Cap: 29.347\nFlow: 0"];
+    0 -> 3 [label="Cap: 6.936\nFlow: 0"];
+    0 -> 4 [label="Cap: 6.675\nFlow: 0"];
+    0 -> 5 [label="Cap: 7.097\nFlow: 0"];
+    1 -> 7 [label="Cap: 5.5\nFlow: 3.36214"];
+    1 -> 8 [label="Cap: 30.25\nFlow: 0"];
+    1 -> 9 [label="Cap: 5.5\nFlow: 0"];
+    1 -> 10 [label="Cap: 24.75\nFlow: 0"];
+    2 -> 8 [label="Cap: 60.5\nFlow: 0"];
+    3 -> 10 [label="Cap: 24.75\nFlow: 0"];
+    4 -> 6 [label="Cap: 11\nFlow: 0"];
+    4 -> 7 [label="Cap: 5.5\nFlow: 0"];
+    4 -> 8 [label="Cap: 30.25\nFlow: 0"];
+    4 -> 9 [label="Cap: 5.5\nFlow: 0"];
+    4 -> 10 [label="Cap: 24.75\nFlow: 0"];
+    4 -> 11 [label="Cap: 13.75\nFlow: 0"];
+    4 -> 12 [label="Cap: 27.5\nFlow: 0"];
+    5 -> 9 [label="Cap: 5.5\nFlow: 0"];
+    5 -> 10 [label="Cap: 24.75\nFlow: 0"];
+    5 -> 11 [label="Cap: 13.75\nFlow: 0"];
+    6 -> 13 [label="Cap: 6.72428\nFlow: 0"];
+    7 -> 13 [label="Cap: 3.36214\nFlow: 3.36214"];
+    8 -> 13 [label="Cap: 18.4918\nFlow: 0"];
+    9 -> 13 [label="Cap: 3.36214\nFlow: 0"];
+    10 -> 13 [label="Cap: 15.1296\nFlow: 0"];
+    11 -> 13 [label="Cap: 8.40535\nFlow: 0"];
+    12 -> 13 [label="Cap: 16.8107\nFlow: 0"];
+}
+

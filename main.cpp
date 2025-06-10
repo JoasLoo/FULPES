@@ -8,10 +8,10 @@
 using namespace std;
 using namespace std::chrono;
 
-const int instanceSize = 2000; //number of EVs/jobs in instance
+const int instanceSize = 2500; //number of EVs/jobs in instance
 int timeStep = 900; //quarterly granularity
 
-bool randomSample = false;
+bool randomSample = true;
 
 vector<int> FOCS_breakpoints;
 
@@ -24,13 +24,17 @@ int main() {
     long long total_graph = 0;
     long long total_init = 0;
     long long total_solve = 0;
+
+    long long total_update = 0;
+    long long total_flow = 0;
+    long long total_edmondskarp = 0;
     
     int repetitions = 100;
 
 
     auto t1 = chrono::high_resolution_clock::now();
 
-    InstanceData instance1 = opendata_toC("Data/DEMSdata_FOCS_v1.csv"); //open data file in C++ DEMSdata_FOCS_v1.csv ev_session_data_OR.csv
+    InstanceData instance1 = opendata_toC("Data/ev_session_data_OR.csv"); //open data file in C++ DEMSdata_FOCS_v1.csv ev_session_data_OR.csv
         //ev_session_data_OR.csv breaks if randomsample, or instancesize = 399 / 200
 
     for (int i = 0; i < repetitions; ++i) {
@@ -54,17 +58,25 @@ int main() {
         total_load  += duration_cast<microseconds>(q1 - t1).count();
     }
     
+
+
+    total_update += g.total_update;
+    total_flow += g.total_flow;
+    total_edmondskarp += g.total_edmondskarp;
     total_graph += duration_cast<microseconds>(q2 - q1).count();
     total_init  += duration_cast<microseconds>(q3 - q2).count();
     total_solve += duration_cast<microseconds>(qx - q3).count();
 
     }
     cout << fixed;
-    //cout << "Average Timings (over " << repetitions << " runs):\n";
-    //cout << "LOADING C DATA       " << total_load  << " micro-s\n";
-    //cout << "INIT C GRAPH         " << total_graph / repetitions << " micro-s\n";
-    //cout << "INIT C FOCS          " << total_init / repetitions  << " micro-s\n";
+    cout << "Average Timings (over " << repetitions << " runs):\n";
+    cout << "LOADING C DATA       " << total_load  << " micro-s\n";
+    cout << "INIT C GRAPH         " << total_graph / repetitions << " micro-s\n";
+    cout << "INIT C FOCS          " << total_init / repetitions  << " micro-s\n";
     cout << "SOLVE C FOCS         " << total_solve / repetitions << " micro-s\n";
+    cout << "TOTAL UPDATE       " << total_update / repetitions  << " micro-s\n";
+    cout << "TOTAL FLOW         " << total_flow / repetitions << " micro-s\n";
+    cout << "TOTAL EDMODNDS     " << total_edmondskarp / repetitions << " micro-s\n";
 
 
 

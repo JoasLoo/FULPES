@@ -58,7 +58,7 @@ total_solve = 0
 timeStep = 900 #quarterly granularity
 maxFlowAlg = shortest_augmenting_path #alternatively use e.g., edmonds_karp, preflow_push, or dinitz
 randomSample = True
-for instanceSize in range(100, 201, 100):
+for instanceSize in range(50, 51, 100):
     print(instanceSize)
     total_load = 0
     total_graph = 0
